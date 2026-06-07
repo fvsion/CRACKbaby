@@ -1,0 +1,21 @@
+{
+  "_readme": "Copy to org.json (or any name) and pass with --org-config FILE at init. Crackbaby generates a targeted org_words.txt wordlist from these fields and runs it at top priority across all rule phases.",
+
+  "_org_name_readme": "Full legal name. Crackbaby generates: case variants of the full name and each word, strips common suffixes (Corp, Inc, LLC, Ltd, Co, Group, Holdings, Services) to get the bare brand name, then generates IT-department naming patterns from the first brand word (e.g. acmeit, acmeadmin, acmevpn, acmenet, acmehelpdesk).",
+  "org_name": "Acme Corporation",
+
+  "_org_name_short_readme": "Short name, ticker, or common abbreviation. Case variants plus the same IT-suffix patterns as org_name. Omit if it duplicates org_name.",
+  "org_name_short": "acme",
+
+  "_org_location_readme": "City and state/country, comma-separated. US state abbreviations (TX, NY, CA …) are automatically expanded to the full state name so both forms appear in the wordlist.",
+  "org_location": "Dallas, TX",
+
+  "_custom_words_readme": "Freeform list of engagement-specific words: internal project names, mascots, sports teams, local landmarks, previous breach passwords, product names, etc. Multi-word entries are also split on spaces/hyphens so each component gets case variants.",
+  "custom_words": [
+    "cowtown",
+    "maverick",
+    "ranger",
+    "BigD",
+    "DFW"
+  ]
+}

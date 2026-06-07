@@ -1,0 +1,39 @@
+{
+  "_readme": "Copy to crackbaby.json (or point $CRACKBABY_CONFIG at it) and edit. Every key is OPTIONAL — delete any you don't need. A matching CLI flag always overrides the config value. The _*_readme keys are documentation only and are ignored by crackbaby.",
+
+  "_hashcat_bin_readme": "Path to the hashcat binary (or its folder). Leave out to auto-detect hashcat on your PATH. CLI: --hashcat",
+  "hashcat_bin": "/opt/hashcat/hashcat",
+
+  "_expected_speed_ghs_readme": "Your GPU's NTLM speed in GH/s. Used ONLY for ETA estimates and time-gating — it never changes on its own. Default 68 (~one RTX 3090). Measure your rig with `crackbaby benchmark` instead of guessing. CLI: --expected-speed",
+  "expected_speed_ghs": 68.0,
+
+  "_workload_readme": "hashcat workload profile: 1=low, 2=default, 3=high, 4=nightmare (may make the machine unresponsive). 3 is a good default for a dedicated cracking box. CLI: --workload",
+  "workload": 3,
+
+  "_custom_rules_dir_readme": "Folder of your own .rule files. Every rule here is ALWAYS used, regardless of default_rule_depth, and takes precedence over a same-named bundled rule. null = none. CLI: --custom-rules-dir",
+  "custom_rules_dir": null,
+
+  "_default_rule_depth_readme": "How many of hashcat's bundled rules to admit: none | A | AB | ABC. Heavier = more cracks but more GPU time. A (default) is best66 + a handful of high-value rules; ABC adds the big community rulesets. CLI: --default-rule-depth",
+  "default_rule_depth": "A",
+
+  "_wordlists_dirs_readme": "Folders to scan for wordlists when you don't pass --wordlists at init. Each .txt/.lst/etc. file found becomes a candidate wordlist. The built-in downloader (crackbaby tools --download rockyou) saves into ~/wordlists, which is searched by default.",
+  "wordlists_dirs": ["/mnt/wordlists"],
+
+  "_default_rules_dirs_readme": "Where hashcat's bundled rules live (e.g. /opt/hashcat/rules). Crackbaby's own best66.rule and toggles1.rule are always found regardless of this setting.",
+  "default_rules_dirs": ["/opt/hashcat/rules"],
+
+  "_global_potfile_readme": "Base path for a potfile SHARED across campaigns, so hashes cracked in a previous engagement are skipped instantly. Crackbaby appends _<hashtype>.potfile (e.g. ~/potfiles/acme -> acme_1000.potfile for NTLM, acme_3000.potfile for LM). null = per-campaign potfile only. CLI: --global-potfile",
+  "global_potfile": null,
+
+  "_max_combinator_pairs_ks_readme": "Cap on the wordlist x wordlist pair count (in pairs) before a combinator/combo_rules phase is even created — keeps the pipeline from generating impossibly large phases. Default 500,000,000. Raise to include bigger pairs. CLI: rebuild --max-combinator-pairs",
+  "max_combinator_pairs_ks": 500000000,
+
+  "_max_rule_convert_words_readme": "For combo_rules phases: if the SMALLER wordlist side has <= this many lines, crackbaby converts it to GPU rules and runs the whole combo on-GPU (fastest). Larger falls back to the combinator.bin pipe. Default 50000. CLI: --max-rule-convert-words",
+  "max_rule_convert_words": 50000,
+
+  "_skip_threshold_hours_readme": "Time-gate: auto-skip any phase whose estimated runtime exceeds this many hours. null = no gating (run everything). CLI: --skip-slow, or `benchmark --set-threshold`.",
+  "skip_threshold_hours": null,
+
+  "_status_interval_readme": "How often (seconds) hashcat reports progress during a phase. Lower = more frequent live updates. CLI: --status-interval",
+  "status_interval": 5
+}

@@ -1,0 +1,119 @@
+# ==========================================================
+# CrackBaby Corp — NTDS Legend / Answer Key
+# Domain: CRKB / crkb.local
+# Company: CrackBaby Corp (IT Services)
+# Location: Austin, TX
+# ==========================================================
+# FORMAT: DOMAIN\username:RID:LMhash:NThash:::
+# FULL KEY: crkb_ntds_key.csv
+#
+# ACCOUNT BREAKDOWN
+# ==========================================================
+# Total entries:         4000
+#   User accounts:       3000
+#   Machine accounts:    1000
+#   LM hash entries:     520 (500 users + 20 pre2k)
+#   Unique NT hashes:    2198
+#   Disabled:            261
+#   Never-expires:       419
+#
+# PASSWORD CATEGORIES
+# ==========================================================
+#   org            876  (29.2%)
+#   append         779  (26.0%)
+#   lm_org         500  (16.7%)
+#   weak           475  (15.8%)
+#   leet           231  (7.7%)
+#   random         116  (3.9%)
+#   svc_role        12  (0.4%)
+#   svc_weak         3  (0.1%)
+#   svc_leet         3  (0.1%)
+#   svc_org          2  (0.1%)
+#   known            1  (0.0%)
+#   empty            1  (0.0%)
+#   krbtgt           1  (0.0%)
+#
+# CRACKABILITY TIERS
+# ==========================================================
+# Tier 1 rockyou:           ~15% (weak)
+# Tier 2 org+wordlist+rules: ~62% (org, append, svc, lm_org, clusters)
+# Tier 3 leet/smart rules:  ~10% (leet)
+# Tier 4 BF/hybrid only:     ~5% (random)
+#
+# BUILT-IN ACCOUNTS
+# ==========================================================
+# Administrator    CrackBabyAdmin2019!
+# Guest            (empty)
+# krbtgt           (random hex)
+#
+# SERVICE ACCOUNTS
+# ==========================================================
+# Account                 Password                  Tier
+# svc_sql                 CrkbSql2021!              [svc_org]
+# svc_backup              BackupCrkb2022!           [svc_org]
+# svc_deploy              DeployService2022!        [svc_role]
+# svc_scan                ScannerSvc2020!           [svc_role]
+# svc_monitor             MonitorSvc2021!           [svc_role]
+# svc_exchange            ExchangeService19!        [svc_role]
+# svc_sharepoint          SharepointSvc22!          [svc_role]
+# svc_jenkins             JenkinsService21!         [svc_role]
+# svc_ansible             AnsibleSvc2022!           [svc_role]
+# svc_splunk              SplunkService20!          [svc_role]
+# svc_vmware              VmwareSvc2019!            [svc_role]
+# svc_citrix              CitrixService21!          [svc_role]
+# svc_print               PrintService123!          [svc_role]
+# svc_smtp                SmtpService2020!          [svc_role]
+# svc_ftp                 Password2020!             [svc_weak]
+# svc_web                 Welcome2022!              [svc_weak]
+# svc_ldap                Service2019!              [svc_weak]
+# svc_api                 S3rvice@pi2021!           [svc_leet]
+# svc_nessus              Sc@nnerSvc2022!           [svc_leet]
+# svc_gitlab              G1tl@bService22!          [svc_leet]
+#
+# HONEYPOT ACCOUNTS
+# ==========================================================
+# admin         Admin2023!                [weak]
+# helpdesk      Austin2023!               [org]
+# support       CrackBaby2022!            [org]
+# sysadmin      Sysadmin2022!             [weak]
+# netadmin      TexasNet2023!             [org]
+# dbadmin       DbAdmin2021!              [weak]
+# backup        Backup2020!               [weak]
+# audit         AuditCrkb2022!            [org]
+#
+# SHARED CLUSTERS
+# ==========================================================
+# cluster1  50 accounts  CrackBaby2023!
+# cluster2  30 accounts  Austin2023!
+#
+# PRE2K MACHINE ACCOUNTS
+# ==========================================================
+# SOC73289$  =>  'soc73289'
+# NOC78676$  =>  'noc78676'
+# CLOUD93899$  =>  'cloud93899'
+# LAPTOP21385$  =>  'laptop21385'
+# BUILD43388$  =>  'build43388'
+# MON29241$  =>  'mon29241'
+# CLOUD54670$  =>  'cloud54670'
+# BACKUP35210$  =>  'backup35210'
+# PROXY07973$  =>  'proxy07973'
+# SRV42913$  =>  'srv42913'
+# BACKUP80509$  =>  'backup80509'
+# BACKUP76668$  =>  'backup76668'
+# PRINT84341$  =>  'print84341'
+# SRV08361$  =>  'srv08361'
+# MAIL23225$  =>  'mail23225'
+# QA87291$  =>  'qa87291'
+# HELP96412$  =>  'help96412'
+# SCAN47252$  =>  'scan47252'
+# SRV17149$  =>  'srv17149'
+# MGMT75553$  =>  'mgmt75553'
+#
+# LM / CRACKING NOTES
+# ==========================================================
+# Empty LM:  aad3b435b51404eeaad3b435b51404ee
+# Empty NT:  31d6cfe0d16ae931b73c59d7e0c089c0
+# LM mode:   3000 (split at 8-char boundary)
+# Svc accts: 2 org-word, 12 role-based, 3 weak, 3 leet
+# Pre2k:     machine name (no $), lowercased
+# Random 5%: pw_category='random' — BF/hybrid only
