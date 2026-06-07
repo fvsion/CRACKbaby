@@ -133,4 +133,6 @@ See [LICENSE](LICENSE).
 ---
 
 ## Donations
-ETH `0xb95bB92446CB7beDF93520800F1b050191A37f28` · BTC `bc1qcjr4wy0gcymd05ndek4nhjd4auq2clam8v7e3t` · SOL `Gp9hD1ar8MWKs2kino4ZNiVJ8HPuLHDRCigbXtgNzpxq`</sub>
+ETH `0xb95bB92446CB7beDF93520800F1b050191A37f28` 
+BTC `bc1qcjr4wy0gcymd05ndek4nhjd4auq2clam8v7e3t` 
+SOL `Gp9hD1ar8MWKs2kino4ZNiVJ8HPuLHDRCigbXtgNzpxq`</sub>
