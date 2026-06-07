@@ -1,4 +1,4 @@
-"""Crackbaby internal modules package.
+"""CRACKbaby internal modules package.
 
 Single source of truth for install-relative directories used across the
 codebase.  Defined here (not per-module) so every importer agrees regardless of

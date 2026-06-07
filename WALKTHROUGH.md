@@ -1,4 +1,4 @@
-# Crackbaby — Example Campaign Walkthrough
+# CRACKbaby — Example Campaign Walkthrough
 
 This is a hands-on, end-to-end tutorial that runs a complete engagement against the
 **bundled sample dump** (`samples/crkb_ntds.dit`). Every command and every block of output
@@ -41,7 +41,7 @@ python crackbaby.py tools
 ```
 
 ```
-  ── Crackbaby Tool Status ─────────────────────────────────────────
+  ── CRACKbaby Tool Status ─────────────────────────────────────────
   [✓] hashcat         : /opt/homebrew/bin/hashcat
   [!] combinator.bin  : not found  (needed for combo_rules fallback)
   [!] rockyou.txt     : not found  (default wordlist)
@@ -103,7 +103,7 @@ What happened:
 - **`--username`** wrote `DOMAIN\user:hash` lines (try `head -2 /tmp/crkb.hashes`), so the
   report counts *accounts* and can show password reuse.
 - **`--lm-file`** found 30 non-null LM hashes — a fast, high-value side-channel (Step 5).
-- **Disabled accounts were kept.** Crackbaby keeps every account unless you pass
+- **Disabled accounts were kept.** CRACKbaby keeps every account unless you pass
   `--enabled-only`; disabled accounts still reveal reused/soon-to-be-re-enabled passwords.
   Add `--unique` if you also want a deduplicated bare-hash file.
 

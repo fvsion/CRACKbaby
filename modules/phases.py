@@ -11,7 +11,7 @@ Attack pipeline order (priority bands):
                18 800 slots at step 5 = 3 760 phases — handles 50+ wordlists without overflow
   60000–69999  Brute force (6–10 char, ordered by keyspace ascending)
 
-Crackbaby builds only direct hashcat attack phases — no separate analysis or
+CRACKbaby builds only direct hashcat attack phases — no separate analysis or
 candidate-generator passes.
 Priority bands are wide enough to accommodate any realistic number of
 wordlists (up to ~50) and rule files (up to ~60 admitted) without overflow.
@@ -1257,7 +1257,7 @@ def _write_enterprise_mask_file(masks_dir: str,
     limit = threshold_hours or 6.0
     path = os.path.join(masks_dir, "enterprise.hcmask")
     with open(path, "w") as f:
-        f.write("# Crackbaby enterprise mask file — built-in patterns\n")
+        f.write("# CRACKbaby enterprise mask file — built-in patterns\n")
         for mask_line, desc, ks in sorted(_ENTERPRISE_MASKS, key=lambda x: x[2]):
             if speed_ghs > 0 and ks / (speed_ghs * 1e9) / 3600 > limit:
                 continue   # too slow — handled as individual ExtMask at 2500-band

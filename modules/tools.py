@@ -194,7 +194,7 @@ def _preflight_check(campaign=None) -> None:
     hashcat_bin = getattr(campaign, "hashcat_bin", None) if campaign else None
     combo_bin   = _find_combinator_bin(campaign=campaign)
 
-    print("\n  ── Crackbaby Tool Status ─────────────────────────────────────────")
+    print("\n  ── CRACKbaby Tool Status ─────────────────────────────────────────")
 
     # hashcat
     if hashcat_bin and os.path.isfile(hashcat_bin):

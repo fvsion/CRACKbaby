@@ -1,4 +1,4 @@
-# Crackbaby — User Guide (v1.0.0)
+# CRACKbaby — User Guide (v1.0.0)
 
 > Operational guide for running NTLM password-recovery engagements with crackbaby.
 > For a quick overview and install steps, see **[README.md](README.md)**.
@@ -29,7 +29,7 @@
 
 ## 1. What crackbaby is
 
-Crackbaby is a single-file, standard-library-only Python orchestrator around **hashcat**.
+CRACKbaby is a single-file, standard-library-only Python orchestrator around **hashcat**.
 You point it at a set of NTLM hashes from an Active Directory dump and it builds and runs
 a prioritised pipeline of hashcat attacks — wordlists, rules, masks, hybrids, combinators,
 and LM cracking — checkpointing after every phase so the whole campaign is **resumable**.
@@ -88,7 +88,7 @@ This reports the hashcat binary, combinator.bin, and whether the default wordlis
 
 ### Getting wordlists
 
-Crackbaby has a built-in, dependency-free downloader. Fetch the default wordlist:
+CRACKbaby has a built-in, dependency-free downloader. Fetch the default wordlist:
 
 ```bash
 python crackbaby.py tools --download rockyou      # → ~/wordlists/rockyou.txt (~133 MB)
@@ -124,7 +124,7 @@ accounts you keep**, because a raw domain dump is full of accounts not worth GPU
 | **System / built-in** | name in `{Guest, krbtgt, defaultaccount, helpassistant, wdagutilityaccount}` or prefix `healthmailbox`/`support_`/`iwam_`/`iusr_`/`aspnet` | `--no-system` | Built-in/service accounts you can't act on; `krbtgt` is a random 64-hex value — never crackable. |
 | **Disabled** | line carries an `Enabled`/`Disabled` status (secretsdump `-user-status`) | `--enabled-only` (opt-in) | **Usually keep them — see below.** |
 
-**Keep disabled accounts by default.** Crackbaby includes every account unless you tell it
+**Keep disabled accounts by default.** CRACKbaby includes every account unless you tell it
 not to; `--enabled-only` is opt-in. Disabled ≠ worthless:
 
 - **Password reuse** — a disabled user's password is frequently shared by an active
@@ -188,7 +188,7 @@ python crackbaby.py init /campaigns/acme \
 
 ### How the pipeline is ordered
 
-Phases run cheapest / highest-yield first. Crackbaby assigns each phase a **priority** and
+Phases run cheapest / highest-yield first. CRACKbaby assigns each phase a **priority** and
 runs ascending:
 
 | Priority | Band | What runs |
@@ -296,7 +296,7 @@ GPU-exhaustible in hours. That means:
 - Even a handful of LM hashes can unlock high-value accounts that resist everything else —
   so always extract them at prep time (`--lm-file`).
 
-Crackbaby exploits this with two phases, added automatically when you pass `--lm-hashes`:
+CRACKbaby exploits this with two phases, added automatically when you pass `--lm-hashes`:
 
 1. **`lm_brute`** (priority 50, hashcat mode 3000) — brute-forces both halves
    (`?a` incrementing 1→7 chars). This recovers the **upper-case** password.
@@ -356,7 +356,7 @@ more GPU time.
 
 Notes:
 
-- Only rules actually **present in your hashcat rules dir** are used. Crackbaby bundles
+- Only rules actually **present in your hashcat rules dir** are used. CRACKbaby bundles
   `best66.rule` and `toggles1.rule` as guaranteed fallbacks (in `crackbaby/rules/`), so the
   org/rockyou rule phases and LM toggle work even on a bare install.
 - Your own rules in `--custom-rules-dir` are **always** admitted, regardless of depth.
@@ -449,7 +449,7 @@ python crackbaby.py init /campaigns/acme --hashes nt.hashes --global-potfile ~/p
 #   → ~/potfiles/acme_1000.potfile (NTLM)  and  ~/potfiles/acme_3000.potfile (LM)
 ```
 
-(Or set `global_potfile` in `config/crackbaby.json`.) Crackbaby appends
+(Or set `global_potfile` in `config/crackbaby.json`.) CRACKbaby appends
 `_<hashtype>.potfile` so NTLM and LM results never mix.
 
 ---

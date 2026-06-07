@@ -1,5 +1,26 @@
 # CRACKbaby
 
+```
+                                        :*@@%-
+                                     =@@@@@@@@@#
+                                    *@@@@@@@@@@@@*
+                                   :@@@#..:-.-%@@@=
+                                   =@@*.=%%=*@@@@@@
+                                   *@@%#@@@@@@@@@@@
+                            .:=*#%%#@@@@@@%@@@@@@@+
+                      .:=*#%%%%%%%%*=#@@@%==++*%#-
+                  .::-=+%%%%%*=-::----:#@@@%%#=:.
+                .:-====+*=:::::::-===-=*+%@@%+:
+               :=****=::+=-::...:--:=:=#+:...
+               =%%*+===--#:-::. :==+=.=%*:             _____ ______  ___  _____  _   __
+              .+%=-::::-.*%@@@@@@@*#*+-%%=            /  __ \| ___ \/ _ \/  __ \| | / /
+     .=#%*+*@@@%%=....:-.-@@@@@@#@*%=%-*@*:           | /  \/| |_/ / /_\ \ /  \/| |/ /
+  :#@%@@@@%@%%@@#:  ..-=:*+     :@*#=%@-##-           | |    |    /|  _  | |    |    \
+ %@@@@@#+%@+.:-:: ..-+=+**:     .%#=#*#.=%*:          | \__/\| |\ \| | | | \__/\| |\  \
+ @@@@@@%#+===+*=:-::==*#*=.      =%--.=*:+@%@%#+:      \____/\_| \_\_| |_/\____/\_| \_/
+ @@@@@@@@@@%#*#%***#%@%*=-.      :+*%%@%%=-:::==-               b  a  b  y
+```
+
 **CRACKbaby** is a single-file, standard-library-only Python orchestrator around
 [hashcat](https://hashcat.net/hashcat/) for systematic, **resumable** NTLM password-recovery
 engagements. Point it at the NTLM hashes from an Active Directory dump and it builds and
@@ -43,7 +64,7 @@ ordering, ETAs and time-gating, per-phase resume, potfile management, and report
 ## Installation
 
 ```bash
-git clone <repo-url> crackbaby
+git clone https://github.com/fvsion/CRACKbaby crackbaby
 cd crackbaby
 
 # Make sure python3 and hashcat are on your PATH, then verify what crackbaby sees:
@@ -132,7 +153,4 @@ See [LICENSE](LICENSE).
 
 ---
 
-## Donations
-ETH `0xb95bB92446CB7beDF93520800F1b050191A37f28` 
-BTC `bc1qcjr4wy0gcymd05ndek4nhjd4auq2clam8v7e3t` 
-SOL `Gp9hD1ar8MWKs2kino4ZNiVJ8HPuLHDRCigbXtgNzpxq`</sub>
+<sub>_Donations (optional):_ ETH `0xb95bB92446CB7beDF93520800F1b050191A37f28` · BTC `bc1qcjr4wy0gcymd05ndek4nhjd4auq2clam8v7e3t` · SOL `Gp9hD1ar8MWKs2kino4ZNiVJ8HPuLHDRCigbXtgNzpxq`</sub>

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Crackbaby — NTLM Password Recovery Tool
+CRACKbaby — NTLM Password Recovery Tool
 ========================================
 Wraps hashcat for systematic, resumable NTLM cracking campaigns.
 
@@ -46,7 +46,7 @@ from modules.speed import (
 from modules.tools import (_find_combinator_bin, _preflight_check,
                            download_wordlist, _WORDLIST_SOURCES)
 
-# ── Crackbaby directories ─────────────────────────────────────────────────────
+# ── CRACKbaby directories ─────────────────────────────────────────────────────
 # _CRACKBABY_DIR → install root (bundled assets: rules/).
 # _CONFIG_DIR    → config/ subdir (speed_factors.json, crackbaby.json).
 # Speed/timing model (factors, history, ETA, gating, benchmark) → modules/speed.py.
@@ -150,7 +150,7 @@ def _print_banner():
             print(line.ljust(W) + "  " + right[ri])
         else:
             print(line)
-    print(f"\n  CRACKBABY v{__version__}  —  NTLM Password Recovery\n")
+    print(f"\n  CRACKbaby v{__version__}  —  NTLM Password Recovery\n")
 
 
 def _tail_log(log_path: str, n: int = 15) -> str:
