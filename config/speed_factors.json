@@ -1,6 +1,5 @@
 {
-  "_note": "Per-type speed ratios (fraction of expected_speed_ghs). Edit to tune for your rig. speed_history.json (actual measured GH/s per campaign) supersedes these once campaigns run. Run 'crackbaby benchmark --update-all' to auto-calibrate brute/mask/wordlist/rules entries AND measure the per-host stdin ceiling + combinator.bin strategy.",
-  "_prince_omen_note": "prince/omen are pipe/generator-bound candidate FEED rates (cand/s \u00f7 1e9), NOT GPU hash-rate fractions \u2014 seeds: omen-enum ~13M/s (omen 0.00019), pp64 ~53M/s (prince piped \u2248 min(pp64, stdin ceiling) \u2248 0.0003). The live omen/prince ETA is computed data-driven from the measured stdin ceiling + generator rate and the per-phase feed (piped vs chunked); these entries are only fallback seeds.",
+  "_note": "Per-type speed ratios (fraction of expected_speed_ghs). Edit to tune for your rig. Run 'crackbaby benchmark --update-all' to auto-calibrate brute/mask/wordlist/rules entries AND measure the per-host stdin ceiling + combinator.bin strategy.",
   "brute": 6.0393,
   "mask": 1.0,
   "wordlist": 0.0316,
@@ -8,14 +7,7 @@
   "hybrid": 0.8,
   "combinator": 0.95,
   "combo_rules_rule": 0.65,
-  "combo_rules_ram_materialize": 0.18,
-  "combo_rules_ssd_materialize": 0.12,
-  "combo_rules_hdd_materialize": 0.04,
   "combo_rules_python_combinator": 0.004,
   "lm_brute": 1.0,
-  "markov": 0.3,
-  "prince": 0.0003,
-  "omen": 0.00019,
-  "combo_rules_chunked_materialize": 0.15,
   "_benchmark_ghs": 22.1786
 }
