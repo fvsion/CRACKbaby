@@ -95,7 +95,7 @@ python3 crackbaby.py init /campaigns/acme \
     --hashes target.hashes --username \
     --org-config acme.org.json \
     --lm-hashes target.lm \
-    --expected-speed 120 --skip-slow 24
+    --skip-slow 6
 
 # 3. Run — execute (or resume) the pipeline. Ctrl-C checkpoints cleanly.
 python3 crackbaby.py run /campaigns/acme
