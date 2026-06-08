@@ -91,17 +91,31 @@ This reports the hashcat binary, combinator.bin, and whether the default wordlis
 CRACKbaby has a built-in, dependency-free downloader. Fetch the default wordlist:
 
 ```bash
-python crackbaby.py tools --download rockyou      # → ~/wordlists/rockyou.txt (~133 MB)
+python crackbaby.py tools --download rockyou      # → crackbaby/wordlists/rockyou.txt (~133 MB)
 ```
 
-- It downloads (and decompresses) into `~/wordlists`, which is on crackbaby's default
-  wordlist search path — so `init` **auto-discovers** it and you never need `--wordlists`.
+- It downloads (and decompresses) into `crackbaby/wordlists/` (a repo-local, gitignored
+  dir on crackbaby's default search path) — so `init` **auto-discovers** it and you never
+  need `--wordlists`. `~/wordlists`, `/opt/wordlists` and `/usr/share/wordlists` are
+  searched too.
 - `--dest DIR` downloads elsewhere; `--force` re-downloads.
 - You can also pass **any http(s) URL** (a `.gz` is decompressed automatically), e.g.
   `python crackbaby.py tools --download https://example.com/lists/weakpass.txt.gz`.
 
-Already have wordlists? Drop them in `~/wordlists` (or any dir in `wordlists_dirs` in your
-config) and `init` finds them automatically; or point `--wordlists` at them directly.
+Already have wordlists? Drop them in any of those search dirs (or set `wordlists_dirs` in
+your config) and `init` finds them automatically; or point `--wordlists` at them directly.
+
+**combinator** (the combo_rules fallback) can be built the same way — it downloads the
+hashcat-utils source and compiles it into `crackbaby/installed_tools/`:
+
+```bash
+python crackbaby.py tools --download combinator   # needs a C compiler (cc/clang/gcc)
+```
+
+On Windows (no compiler), grab `combinator.exe` from the
+[hashcat-utils releases](https://github.com/hashcat/hashcat-utils/releases) and drop it in
+`installed_tools/`. combinator also ships with hashcat, so this is only needed if it isn't
+already alongside your hashcat binary.
 
 ---
 
@@ -180,7 +194,7 @@ phase pipeline:
 ```bash
 python crackbaby.py init /campaigns/acme \
     --hashes target.hashes --username \
-    --wordlists ~/wordlists/rockyou.txt \
+    --wordlists crackbaby/wordlists/rockyou.txt \
     --org-config acme.org.json \
     --lm-hashes target.lm \
     --expected-speed 120 --skip-slow 24
@@ -210,7 +224,7 @@ is why time-gating exists — §10).
 
 - `--hashes FILE` (required); `--username` (match your prep choice).
 - `--wordlists WL...` — your wordlists. **Optional** — if omitted, crackbaby
-  auto-discovers wordlists from `~/wordlists` and the other search dirs (rockyou is the
+  auto-discovers wordlists from `crackbaby/wordlists/` and the other search dirs (rockyou is the
   default). If none are found on an interactive run, it offers to download rockyou for you.
 - `--org-config FILE` — generate a targeted org wordlist (§8).
 - `--lm-hashes FILE` — add the LM fast-path phases (§7).
@@ -427,8 +441,8 @@ strategy automatically:
    hashcat rule file and runs `-a 0 big_side -r small_as_rules -r best66` entirely on the
    GPU. Fastest path.
 2. **combinator.bin pipe** *(fallback)* — if the small side is larger, crackbaby pipes
-   `combinator.bin wl1 wl2` into hashcat's stdin. Requires `combinator.bin` (ships with
-   hashcat; check `crackbaby tools`).
+   `combinator.bin wl1 wl2` into hashcat's stdin. Requires `combinator.bin` — it ships with
+   hashcat, or build it with `crackbaby tools --download combinator` (check `crackbaby tools`).
 
 Tune the thresholds:
 
@@ -531,13 +545,14 @@ python crackbaby.py init /campaigns/acme --hashes nt.hashes --global-potfile ~/p
 | `--keep-pending` | additive only (don't replace pending phases) |
 | `--dry-run` | preview changes |
 
-### tools — show tool status / download wordlists
+### tools — show tool status / download wordlists & combinator
 | Flag | Meaning |
 |---|---|
 | *(none)* | status of hashcat, combinator.bin, and the default wordlist |
-| `--download [NAME\|URL]` | download a wordlist into `~/wordlists` (default `rockyou`; or any http(s) URL, `.gz` auto-decompressed) |
-| `--dest DIR` | download into `DIR` instead of `~/wordlists` |
-| `--force` | re-download even if the wordlist already exists |
+| `--download [NAME\|URL]` | download a wordlist into `crackbaby/wordlists/` (default `rockyou`; or any http(s) URL, `.gz` auto-decompressed) |
+| `--download combinator` | download + compile the combinator binary into `crackbaby/installed_tools/` |
+| `--dest DIR` | download a wordlist into `DIR` instead of `crackbaby/wordlists/` |
+| `--force` | re-download / rebuild even if already present |
 
 ### clean — delete scratch artifacts
 | Flag | Meaning |
@@ -590,7 +605,7 @@ python crackbaby.py prep \
 # 2. Init — org-aware, LM-enabled (calibrate speed later)
 python crackbaby.py init /campaigns/crkb \
     --hashes crkb.hashes --username \
-    --wordlists ~/wordlists/rockyou.txt \
+    --wordlists crackbaby/wordlists/rockyou.txt \
     --org-config samples/crkb_org.json \
     --lm-hashes crkb.lm \
     --expected-speed 50 --no-benchmark --skip-slow 24

@@ -1,13 +1,13 @@
 {
-  "_note": "Per-type speed ratios (fraction of expected_speed_ghs). Edit to tune for your rig. Run 'crackbaby benchmark --update-all' to auto-calibrate brute/mask/wordlist/rules entries AND measure the per-host stdin ceiling + combinator.bin strategy.",
-  "brute": 6.0393,
+  "_note": "Per-type speed ratios (fraction of expected_speed_ghs). Edit to tune for your rig. Run 'crackbaby benchmark --update-all' to overwrite with measured values.",
+  "brute": 1.0,
   "mask": 1.0,
-  "wordlist": 0.0316,
-  "rules": 0.6157,
+  "wordlist": 0.9,
+  "rules": 0.16,
   "hybrid": 0.8,
   "combinator": 0.95,
   "combo_rules_rule": 0.65,
-  "combo_rules_python_combinator": 0.004,
+  "combo_rules_combinator_bin": 0.08,
   "lm_brute": 1.0,
-  "_benchmark_ghs": 22.1786
+  "lm_toggle": 0.16
 }

@@ -115,10 +115,10 @@ _RULE_PRIORITY: dict = {
 }
 
 _WORDLIST_SEARCH_PATHS = [
+    os.path.join(_CRACKBABY_DIR, "wordlists"),   # crackbaby's own downloads (tools --download)
     "/usr/share/wordlists",
     "/opt/wordlists",
     os.path.expanduser("~/wordlists"),
-    "./wordlists",
 ]
 
 

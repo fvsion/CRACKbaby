@@ -63,11 +63,12 @@ python crackbaby.py tools --download rockyou
     from https://weakpass.com/download/90/rockyou.txt.gz
     100.0%  (50.9 MB / 50.9 MB)
   Decompressing → rockyou.txt …
-  [✓] rockyou.txt ready: ~/wordlists/rockyou.txt  (133.4 MB)
+  [✓] rockyou.txt ready: crackbaby/wordlists/rockyou.txt  (133.4 MB)
 ```
 
-It lands in `~/wordlists`, which `init` searches automatically — so we won't pass
-`--wordlists` at all below.
+It lands in `crackbaby/wordlists/`, which `init` searches automatically — so we won't pass
+`--wordlists` at all below. (`~/wordlists`, `/opt/wordlists` and `/usr/share/wordlists` are
+searched too, if you keep wordlists there.)
 
 ---
 
@@ -122,8 +123,8 @@ python crackbaby.py init /tmp/crkb \
 (No `--wordlists` — crackbaby auto-discovers the rockyou we downloaded in Step 0.)
 
 ```
-  Wordlists: 1 auto-discovered  (dirs: /usr/share/wordlists, /opt/wordlists, ~/wordlists, ./wordlists)
-             • ~/wordlists/rockyou.txt
+  Wordlists: 1 auto-discovered  (dirs: crackbaby/wordlists, /usr/share/wordlists, /opt/wordlists, ~/wordlists)
+             • crackbaby/wordlists/rockyou.txt
   Hash file: 2998 total lines, 1196 unique NT hashes
   Org config:  samples/crkb_org.json   (name: CrackBaby Corp / short: CRKB / Austin, TX)
   LM hashes:    30 hashes → LM brute phase added at priority 50

@@ -1,0 +1,58 @@
+# ── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.venv/
+venv/
+
+# ── OS / editor cruft ────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.idea/
+.vscode/
+
+# ── Sensitive engagement data — NEVER commit real hashes or recovered passwords
+# prep output and cracking results contain live NTLM/LM hashes and plaintexts.
+*.hashes
+*.lm
+*.pot
+*.potfile
+cracked*.txt
+lm_cracked*.txt
+
+# ── Campaign runtime output ──────────────────────────────────────────────────
+# Campaigns are normally created outside the repo; these patterns keep their
+# artifacts out of git if one is ever created in-tree.
+campaign.json
+report.txt
+report.json
+*.restore
+*.hcmask
+logs/
+sessions/
+speed_history.json
+
+# ── User-specific config (the *.sample files ARE committed) ──────────────────
+config/crackbaby.json
+config/org.json
+
+# ── Crackbaby-managed downloads / built tools (machine-specific, not for git) ─
+# `tools --download` saves wordlists into wordlists/ and builds combinator into
+# installed_tools/. These are large/platform-specific and don't belong in git.
+wordlists/
+installed_tools/
+
+# ── Internal notes (not for publication) ─────────────────────────────────────
+memory/
+
+# ── Oversized bundled wordlist ───────────────────────────────────────────────
+# rockyou.txt is ~133 MB — over GitHub's 100 MB hard limit, so it can't be
+# committed directly. Use `crackbaby tools --download rockyou` instead. The small
+# sample NTDS files in samples/ (crkb_ntds.dit, *_legend.txt, *_org.json) ARE committed.
+samples/rockyou.txt

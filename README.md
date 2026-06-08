@@ -70,8 +70,10 @@ cd crackbaby
 # Make sure python3 and hashcat are on your PATH, then verify what crackbaby sees:
 python3 crackbaby.py tools
 
-# Fetch the default wordlist (rockyou, ~133 MB) into ~/wordlists:
+# Fetch the default wordlist (rockyou, ~133 MB) into crackbaby/wordlists/:
 python3 crackbaby.py tools --download rockyou
+# (optional) build combinator.bin into installed_tools/ for large combo phases:
+python3 crackbaby.py tools --download combinator
 ```
 
 There is nothing to build or `pip install`. Optionally copy the config sample to set
@@ -89,7 +91,7 @@ python3 crackbaby.py prep \
     --username --no-machines --no-system --lm-file target.lm
 
 # 2. Init — create a campaign and build the attack pipeline. rockyou is the default
-#    wordlist (auto-discovered from ~/wordlists), so --wordlists is optional. Add
+#    wordlist (auto-discovered from crackbaby/wordlists/), so --wordlists is optional. Add
 #    --org-config for a targeted wordlist and --lm-hashes to enable the LM fast-path.
 python3 crackbaby.py init /campaigns/acme \
     --hashes target.hashes --username \

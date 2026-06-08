@@ -16,7 +16,7 @@
   "_default_rule_depth_readme": "How many of hashcat's bundled rules to admit: none | A | AB | ABC. Heavier = more cracks but more GPU time. A (default) is best66 + a handful of high-value rules; ABC adds the big community rulesets. CLI: --default-rule-depth",
   "default_rule_depth": "A",
 
-  "_wordlists_dirs_readme": "Folders to scan for wordlists when you don't pass --wordlists at init. Each .txt/.lst/etc. file found becomes a candidate wordlist. The built-in downloader (crackbaby tools --download rockyou) saves into ~/wordlists, which is searched by default.",
+  "_wordlists_dirs_readme": "Folders to scan for wordlists when you don't pass --wordlists at init. Each .txt/.lst/etc. file found becomes a candidate wordlist. The built-in downloader (crackbaby tools --download rockyou) saves into crackbaby/wordlists/, which is searched by default.",
   "wordlists_dirs": ["/mnt/wordlists"],
 
   "_default_rules_dirs_readme": "Where hashcat's bundled rules live (e.g. /opt/hashcat/rules). Crackbaby's own best66.rule and toggles1.rule are always found regardless of this setting.",

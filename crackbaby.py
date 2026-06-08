@@ -44,7 +44,7 @@ from modules.speed import (
     _phase_speed_ghs, _phase_speed_key,
 )
 from modules.tools import (_find_combinator_bin, _preflight_check,
-                           download_wordlist, _WORDLIST_SOURCES)
+                           download_wordlist, build_combinator_bin, _WORDLIST_SOURCES)
 
 # ── CRACKbaby directories ─────────────────────────────────────────────────────
 # _CRACKBABY_DIR → install root (bundled assets: rules/).
@@ -338,10 +338,10 @@ def _find_default_wordlists() -> List[str]:
     # 2. Well-known absolute fallbacks (covers default installs whose rockyou lives
     #    outside the listed dirs).  .gz is omitted — hashcat -a 0 can't read it.
     for c in (
+        os.path.join(_CRACKBABY_DIR, "wordlists", "rockyou.txt"),
         "/usr/share/wordlists/rockyou.txt",
         os.path.expanduser("~/wordlists/rockyou.txt"),
         "/opt/wordlists/rockyou.txt",
-        "./wordlists/rockyou.txt",
         "/usr/share/seclists/Passwords/Leaked-Databases/rockyou.txt",
         "/usr/share/seclists/Passwords/Common-Credentials/10-million-password-list-top-1000000.txt",
     ):
@@ -573,11 +573,14 @@ def _generate_new_phases(campaign) -> list:
 
 def cmd_tools(args: argparse.Namespace) -> None:
     """Show tool status, or download a wordlist."""
-    # --download NAME|URL → fetch a wordlist and exit.
+    # --download NAME|URL → fetch a wordlist (or build combinator) and exit.
     if getattr(args, "download", None):
-        path = download_wordlist(args.download,
-                                 dest_dir=getattr(args, "dest", None),
-                                 force=getattr(args, "force", False))
+        if args.download == "combinator":
+            path = build_combinator_bin(force=getattr(args, "force", False))
+        else:
+            path = download_wordlist(args.download,
+                                     dest_dir=getattr(args, "dest", None),
+                                     force=getattr(args, "force", False))
         sys.exit(0 if path else 1)
 
     # Try to load an existing campaign for context (so we know hashcat path)
@@ -2682,22 +2685,25 @@ def main():
                     "  • rockyou.txt    — the default wordlist (download with --download)\n\n"
                     "Can be run at any time, before or after init.",
         epilog="Examples:\n"
-               "  crackbaby tools                     # show tool + wordlist status\n"
-               "  crackbaby tools --download rockyou  # fetch the default wordlist → ~/wordlists\n"
-               "  crackbaby tools --download <URL>    # fetch any wordlist (.gz auto-decompressed)\n"
+               "  crackbaby tools                       # show tool + wordlist status\n"
+               "  crackbaby tools --download rockyou    # fetch the default wordlist → crackbaby/wordlists/\n"
+               "  crackbaby tools --download combinator # build combinator → crackbaby/installed_tools/\n"
+               "  crackbaby tools --download <URL>      # fetch any wordlist (.gz auto-decompressed)\n"
                "  crackbaby tools --download rockyou --dest /mnt/wordlists --force",
         formatter_class=argparse.RawDescriptionHelpFormatter)
     p_tools.add_argument("--status", action="store_true",
                          help="Print tool status (this is the default behaviour)")
     p_tools.add_argument("--download", nargs="?", const="rockyou", metavar="NAME|URL",
-                         help="Download a wordlist into ~/wordlists and exit. "
+                         help="Download a wordlist into crackbaby/wordlists/ and exit. "
                               f"Known names: {', '.join(sorted(_WORDLIST_SOURCES))} "
                               "(default: rockyou); or pass any http(s) URL (.gz is "
-                              "auto-decompressed).")
+                              "auto-decompressed). Special: 'combinator' downloads + compiles "
+                              "the combinator binary into crackbaby/installed_tools/.")
     p_tools.add_argument("--dest", metavar="DIR",
-                         help="Directory to download into (default: ~/wordlists)")
+                         help="Directory to download a wordlist into "
+                              "(default: crackbaby/wordlists/; ignored for combinator)")
     p_tools.add_argument("--force", action="store_true",
-                         help="Re-download even if the wordlist is already present")
+                         help="Re-download / rebuild even if already present")
 
     # prep
     p_prep = sub.add_parser("prep",
