@@ -21,7 +21,7 @@
  @@@@@@@@@@%#*#%***#%@%*=-.      :+*%%@%%=-:::==-               b  a  b  y
 ```
 
-**CRACKbaby** is a single-file, standard-library-only Python orchestrator around
+**CRACKbaby** is a standard-library-only Python orchestrator around
 [hashcat](https://hashcat.net/hashcat/) for systematic, **resumable** NTLM password-recovery
 engagements. Point it at the NTLM hashes from an Active Directory dump and it builds and
 runs a prioritised pipeline of hashcat attacks — wordlists, rules, masks, hybrids,
@@ -57,7 +57,7 @@ ordering, ETAs and time-gating, per-phase resume, potfile management, and report
 - Python 3.8+ (standard library only)
 - hashcat 6.x or 7.x
 - One or more wordlists (e.g. rockyou)
-- Optional: `combinator.bin` (ships with hashcat) — only for very large wordlist×wordlist phases
+- Optional: `combinator.bin` (ships with hashcat) — only for very large wordlist×wordlistxrule phases
 
 ---
 
