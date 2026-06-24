@@ -26,11 +26,15 @@ from collections import Counter
 from typing import List, Optional, Tuple
 
 from .campaign import Campaign, Phase
+from .console import Console, ACCENT, INFO, MUTED, WARN
 
 # ── Install roots (single source of truth in modules/__init__.py) ─────────────
 # _CRACKBABY_DIR → install root (bundled assets: rules/)
 # _CONFIG_DIR    → config/ subdir (speed_factors.json, crackbaby.json)
 from . import CRACKBABY_ROOT as _CRACKBABY_DIR, CONFIG_DIR as _CONFIG_DIR
+
+# Shared stdout console for pipeline-build messages (colour auto-degrades off-TTY).
+_con = Console()
 
 # ── Phase ID counter ──────────────────────────────────────────────────────────
 
@@ -760,7 +764,7 @@ def build_initial_phases(campaign: Campaign) -> List[Phase]:
     # Resolve available wordlists
     wordlists = [w for w in campaign.wordlists if os.path.exists(w)]
     if not wordlists:
-        print("  [WARNING] No wordlists found — wordlist phases will be skipped")
+        _con.warn("No wordlists found — wordlist phases will be skipped")
 
     # ── 50: LM hash cracking (if lm_hash_file provided) ──────────────────
     if campaign.lm_hash_file and os.path.exists(campaign.lm_hash_file):
@@ -777,7 +781,7 @@ def build_initial_phases(campaign: Campaign) -> List[Phase]:
             estimated_keyspace=sum(95**i for i in range(1, 8)),
             notes=campaign.lm_hash_file,
         ))
-        print(f"  LM hashes:    {lm_count} hashes → LM brute phase added at priority 50")
+        _con.kv("LM hashes", f"{lm_count} hashes → LM brute phase added (priority 50)")
 
         # Phase 2: Feed LM plaintexts back through NTLM with toggle rules
         toggle_path = find_rule(custom_rules_dir, "toggles1.rule")
@@ -790,11 +794,11 @@ def build_initial_phases(campaign: Campaign) -> List[Phase]:
                 priority=60,
                 notes=lm_cracked_path,
             ))
-            print(f"  LM toggle:    NTLM recovery via toggles1 → priority 60")
+            _con.kv("LM toggle", "NTLM recovery via toggles1 → priority 60")
         else:
-            print("  [WARNING] toggles1.rule not found — LM toggle phase skipped")
+            _con.warn("toggles1.rule not found — LM toggle phase skipped")
     elif campaign.lm_hash_file:
-        print(f"  [WARNING] LM hash file not found: {campaign.lm_hash_file}")
+        _con.warn(f"LM hash file not found: {campaign.lm_hash_file}")
 
     # ── 95: Org-targeted wordlist ─────────────────────────────────────────────
     # Generate from org_name / org_name_short / org_location (if set).
@@ -871,22 +875,28 @@ def build_initial_phases(campaign: Campaign) -> List[Phase]:
     default_unknown = sorted(set(default_rules) - set(_RULE_PRIORITY))
 
     if custom_rules_dir:
-        print(f"  Custom rules: {custom_rules_dir}  ({len(custom_rules)} files, always admitted)")
+        _con.kv("Custom rules", f"{custom_rules_dir}  ({len(custom_rules)} files, always admitted)",
+                value_role=INFO)
     if found_default_dir and found_default_dir != custom_rules_dir:
-        print(f"  Default rules: {found_default_dir}  ({len(default_rules)} files, depth={default_rule_depth})")
+        _con.kv("Default rules", f"{found_default_dir}  ({len(default_rules)} files, "
+                f"depth={default_rule_depth})", value_role=INFO)
     if not custom_rules_dir and not found_default_dir:
-        print("  [WARNING] No rules directory found — rule phases skipped")
-        print(f"  Searched: {', '.join(_RULE_SEARCH_PATHS)}")
+        _con.warn("No rules directory found — rule phases skipped")
+        _con.bullet(_RULE_SEARCH_PATHS, role=MUTED)
     if known_found:
-        print(f"  Rules matched: {len(known_found)} known"
-              + (f" + {len(custom_unknown + default_unknown)} unknown" if custom_unknown or default_unknown else ""))
+        _n_unknown = len(custom_unknown + default_unknown)
+        _con.kv("Rules matched", f"{len(known_found)} known"
+                + (f" + {_n_unknown} unknown" if _n_unknown else ""))
+        _con.bullet(known_found[:12], more=max(0, len(known_found) - 12))
     if c3_excluded:
-        print(f"  Tier C excluded (default_rule_depth={default_rule_depth}): {', '.join(c3_excluded)}"
-              f" — use --default-rule-depth ABC to include pre-analysis")
+        _con.note(f"Tier C excluded (depth={default_rule_depth}; "
+                  f"--default-rule-depth ABC to include):")
+        _con.bullet(c3_excluded, role=MUTED)
     if known_miss:
         absent_important = [n for n in known_miss if _RULE_PRIORITY[n][0] == "A"]
         if absent_important:
-            print(f"  Tier A absent: {', '.join(absent_important)}")
+            _con.note("Tier A rules absent:")
+            _con.bullet(absent_important, role=WARN)
 
     # ── 100: Straight wordlist ─────────────────────────────────────────────
     # If any rules are available, every wordlist will be amplified by those
@@ -896,11 +906,12 @@ def build_initial_phases(campaign: Campaign) -> List[Phase]:
     # When NO rules are found at all, keep the bare pass as the only option.
     _has_rules = bool(ordered_rules)
     if _has_rules:
-        print("  Straight wordlist phases skipped — rules available "
-              f"({', '.join(n for n, *_ in ordered_rules[:3])}"
-              + (" …" if len(ordered_rules) > 3 else "") + ")")
+        _names = [n for n, *_ in ordered_rules[:3]]
+        _suffix = ", …" if len(ordered_rules) > 3 else ""
+        _con.note(f"Straight wordlist phases skipped — rules available "
+                  f"({', '.join(_names)}{_suffix})")
     else:
-        print("  No rules found — keeping straight wordlist phases")
+        _con.note("No rules found — keeping straight wordlist phases")
     priority = 100
     for wl in wordlists:
         if wl == org_wl:
@@ -1094,9 +1105,9 @@ def build_initial_phases(campaign: Campaign) -> List[Phase]:
             priority += 5
 
     if _skipped_wl_pairs:
-        print(f"  WL×WL pairs skipped (over {_fmt_keyspace(_combo_ks_limit)} threshold): "
-              + ", ".join(_skipped_wl_pairs[:6])
-              + (" …" if len(_skipped_wl_pairs) > 6 else ""))
+        _con.note(f"WL×WL pairs skipped (over {_fmt_keyspace(_combo_ks_limit)} threshold):")
+        _con.bullet(_skipped_wl_pairs[:6], more=max(0, len(_skipped_wl_pairs) - 6),
+                    role=MUTED)
 
     # ── Combinator × best66 ───────────────────────────────────────────────
     # Same ordered pairs as plain combinator, with best66 applied via generator pipe.
@@ -1106,7 +1117,7 @@ def build_initial_phases(campaign: Campaign) -> List[Phase]:
     # Wordlist paths stored in combo_wl1/combo_wl2; Python feeder generates candidates.
     _combo_rule_path = find_rule(campaign.custom_rules_dir, "best66.rule")
     if not _combo_rule_path:
-        print("  [INFO] Combo+rules phases skipped: best66.rule not found")
+        _con.note("Combo+rules phases skipped: best66.rule not found")
     else:
         _n_rules   = _count_rule_lines(_combo_rule_path)
         _rule_name = os.path.basename(_combo_rule_path)
@@ -1142,14 +1153,12 @@ def build_initial_phases(campaign: Campaign) -> List[Phase]:
                 priority += 5
                 _combo_rules_added += 1
         if _combo_rules_added:
-            print(f"  Combo+rules: {_combo_rules_added} phase(s) ({_rule_name})")
+            _con.kv("Combo+rules", f"{_combo_rules_added} phase(s) ({_rule_name})")
         if _combo_rules_skipped:
-            print(f"  Combo+rules pairs skipped "
-                  f"(over {_fmt_keyspace(_combo_ks_limit)} threshold; "
-                  f"raise --max-combinator-pairs-ks to include): "
-                  + ", ".join(_combo_rules_skipped[:6])
-                  + (f" … (+{len(_combo_rules_skipped)-6} more)"
-                     if len(_combo_rules_skipped) > 6 else ""))
+            _con.note(f"Combo+rules pairs skipped (over {_fmt_keyspace(_combo_ks_limit)} "
+                      f"threshold; raise --max-combinator-pairs-ks to include):")
+            _con.bullet(_combo_rules_skipped[:6],
+                        more=max(0, len(_combo_rules_skipped) - 6), role=MUTED)
 
     # ── 1100: Two-word passphrase / common-word (combinator) attacks ──
     # Catches patterns like WinterRain, BlueSky, AdminUser, Summer2024!, ChangeMe!
@@ -1454,7 +1463,7 @@ def _write_org_wordlist(campaign: Campaign) -> Optional[str]:
     with open(path, "w") as f:
         for w in sorted(words):
             f.write(w + "\n")
-    print(f"  Org wordlist: {len(words)} entries → org_words.txt")
+    _con.kv("Org wordlist", f"{len(words)} entries → org_words.txt")
     return path
 
 

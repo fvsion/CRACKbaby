@@ -45,6 +45,17 @@ from modules.speed import (
 )
 from modules.tools import (_find_combinator_bin, _preflight_check,
                            download_wordlist, build_combinator_bin, _WORDLIST_SOURCES)
+from modules import console as _con
+from modules.console import (
+    Console, Column, IND,
+    ACCENT, INFO, MUTED, WARN, ERR, OK, BOLD, TITLE,
+    badge_for, set_color_enabled,
+)
+
+# Shared stdout console for all interactive output. Colour auto-degrades when
+# stdout isn't a TTY (or NO_COLOR / --no-color); rebuilt by main() once the
+# global --no-color flag is parsed so width/colour reflect the live terminal.
+con = Console()
 
 # ── CRACKbaby directories ─────────────────────────────────────────────────────
 # _CRACKBABY_DIR → install root (bundled assets: rules/).
@@ -150,7 +161,10 @@ def _print_banner():
             print(line.ljust(W) + "  " + right[ri])
         else:
             print(line)
-    print(f"\n  CRACKbaby v{__version__}  —  NTLM Password Recovery\n")
+    con.blank()
+    con.print(f"{IND}{con.paint(f'CRACKbaby v{__version__}', TITLE)}"
+              f"{con.paint('  —  NTLM Password Recovery', MUTED)}")
+    con.blank()
 
 
 def _tail_log(log_path: str, n: int = 15) -> str:
@@ -220,7 +234,7 @@ def _convert_small_side_to_rules(campaign, small_path: str, mode: str):
     try:
         os.makedirs(cache_dir, exist_ok=True)
     except OSError as _e:
-        print(f"  [WARN] cannot create rules cache dir {cache_dir}: {_e}")
+        con.warn(f"cannot create rules cache dir {cache_dir}: {_e}")
         return None
 
     a = os.path.abspath(small_path)
@@ -229,28 +243,29 @@ def _convert_small_side_to_rules(campaign, small_path: str, mode: str):
     rule_path = os.path.join(cache_dir, f"{key}.rule")
 
     if os.path.exists(rule_path) and os.path.getsize(rule_path) > 0:
-        print(f"  [rules_cache] reusing {rule_path}")
+        con.note(f"{con.paint('[rules_cache]', INFO)} reusing {rule_path}")
         return rule_path
 
     try:
         written, skipped = _wordlist_to_rules(small_path, rule_path, mode)
     except Exception as e:
-        print(f"  [WARN] rule conversion failed: {e}")
+        con.warn(f"rule conversion failed: {e}")
         try: os.unlink(rule_path)
         except OSError: pass
         return None
 
     if written == 0:
-        print(f"  [WARN] rule conversion produced 0 usable rules "
-              f"(all {skipped} words skipped) — cannot use rules strategy")
+        con.warn(f"rule conversion produced 0 usable rules "
+                 f"(all {skipped} words skipped) — cannot use rules strategy")
         try: os.unlink(rule_path)
         except OSError: pass
         return None
 
-    msg = f"  [rules] converted {written:,} word(s) → {mode} rules: {rule_path}"
+    msg = (f"{con.paint('[rules]', INFO)} converted "
+           f"{con.paint(f'{written:,}', ACCENT)} word(s) → {mode} rules: {rule_path}")
     if skipped:
         msg += f"  ({skipped:,} skipped: non-ASCII or >{_RULE_CONVERT_MAX_WORD_LEN} chars)"
-    print(msg)
+    con.note(msg)
     return rule_path
 
 
@@ -417,13 +432,16 @@ def cmd_prep(args: argparse.Namespace) -> None:
     no_machines    = getattr(args, "no_machines", False)
     no_system      = getattr(args, "no_system", False)
 
-    print(f"  Parsing NTDS dump: {ntds}")
-    if enabled_only:
-        print("  Filter: enabled accounts only")
-    if no_machines:
-        print("  Filter: machine accounts excluded")
-    if no_system:
-        print("  Filter: system/built-in accounts excluded")
+    con.blank()
+    con.rule("Prep: extract NT hashes")
+    con.blank()
+    con.kv("NTDS dump", ntds, value_role=INFO)
+    _filters = []
+    if enabled_only: _filters.append("enabled accounts only")
+    if no_machines:  _filters.append("machine accounts excluded")
+    if no_system:    _filters.append("system/built-in accounts excluded")
+    if _filters:
+        con.kv("Filters", ", ".join(_filters), value_role=MUTED)
 
     total = 0
     written = 0
@@ -478,11 +496,15 @@ def cmd_prep(args: argparse.Namespace) -> None:
 
     skipped = skip_disabled + skip_machine + skip_system
     if skipped:
-        print(f"  Filtered out:  {skipped} accounts total")
-        if skip_disabled: print(f"    Disabled:    {skip_disabled}")
-        if skip_machine:  print(f"    Machine ($): {skip_machine}")
-        if skip_system:   print(f"    System:      {skip_system}")
-    print(f"  NT hashes written: {written}  →  {out}")
+        con.blank()
+        con.kv("Filtered out", f"{skipped} accounts total", value_role=MUTED)
+        _breakdown = []
+        if skip_disabled: _breakdown.append(f"disabled: {skip_disabled}")
+        if skip_machine:  _breakdown.append(f"machine ($): {skip_machine}")
+        if skip_system:   _breakdown.append(f"system: {skip_system}")
+        con.bullet(_breakdown, role=MUTED)
+    con.blank()
+    con.ok(f"NT hashes written: {con.paint(str(written), ACCENT)}  →  {con.paint(out, INFO)}")
 
     if lm_out:
         # Deduplicate LM hashes
@@ -490,7 +512,8 @@ def cmd_prep(args: argparse.Namespace) -> None:
         with open(lm_out, "w") as lf:
             for h in unique_lm:
                 lf.write(h + "\n")
-        print(f"  LM hashes:   {len(unique_lm)} non-null  →  {lm_out}")
+        con.ok(f"LM hashes: {con.paint(str(len(unique_lm)), ACCENT)} non-null  "
+               f"→  {con.paint(lm_out, INFO)}")
 
     if args.unique:
         unique_hashes = set(h for _, h in users)
@@ -502,7 +525,8 @@ def cmd_prep(args: argparse.Namespace) -> None:
         with open(uniq_path, "w") as uf:
             for h in sorted(unique_hashes):
                 uf.write(h + "\n")
-        print(f"  Unique NT:   {len(unique_hashes)}  →  {uniq_path}")
+        con.ok(f"Unique NT: {con.paint(str(len(unique_hashes)), ACCENT)}  "
+               f"→  {con.paint(uniq_path, INFO)}")
 
 
 # ── INIT helpers ─────────────────────────────────────────────────────────────
@@ -600,16 +624,22 @@ def cmd_init(args: argparse.Namespace) -> None:
     """Initialize a new campaign directory and generate phase pipeline."""
     out_dir = os.path.abspath(args.campaign)
     if os.path.exists(os.path.join(out_dir, "campaign.json")):
-        print(f"  ERROR: Campaign already exists at {out_dir}")
-        print("  Use 'python crackbaby.py run' to continue it, or delete the directory to restart.")
-        print("  Use 'python crackbaby.py add --wordlists ...' to add new wordlists.")
-        print("  Use 'python crackbaby.py rebuild' to update settings or regenerate the phase list.")
+        con.error(f"Campaign already exists at {out_dir}")
+        con.bullet([
+            "run    — continue it (or delete the directory to restart)",
+            "add --wordlists ...  — add new wordlists",
+            "rebuild              — update settings / regenerate phases",
+        ], role=MUTED)
         sys.exit(1)
 
     # --hashes is required for new campaigns
     if not args.hashes:
-        print("  ERROR: --hashes is required when initializing a new campaign.")
+        con.error("--hashes is required when initializing a new campaign.")
         sys.exit(1)
+
+    con.blank()
+    con.rule("Init: build attack pipeline")
+    con.blank()
 
     os.makedirs(out_dir, exist_ok=True)
     for sub in ("sessions", "wordlists", "masks", "logs"):
@@ -617,7 +647,7 @@ def cmd_init(args: argparse.Namespace) -> None:
 
     hash_file = os.path.abspath(args.hashes)
     if not os.path.exists(hash_file):
-        print(f"  ERROR: Hash file not found: {hash_file}")
+        con.error(f"Hash file not found: {hash_file}")
         sys.exit(1)
 
     hashcat_bin = _resolve_hashcat_bin(args.hashcat or _find_hashcat())
@@ -627,24 +657,20 @@ def cmd_init(args: argparse.Namespace) -> None:
             if os.path.exists(w):
                 wordlists.append(os.path.abspath(w))
             else:
-                print(f"  WARNING: wordlist not found, skipping: {w}")
+                con.warn(f"wordlist not found, skipping: {w}")
     if not wordlists:
         wordlists = _find_default_wordlists()
         if wordlists:
-            from modules.phases import _WORDLIST_SEARCH_PATHS
-            print(f"  Wordlists: {len(wordlists)} auto-discovered "
-                  f"(dirs: {', '.join(_WORDLIST_SEARCH_PATHS)})")
-            for _w in wordlists[:10]:
-                print(f"             • {_w}")
-            if len(wordlists) > 10:
-                print(f"             … and {len(wordlists) - 10} more")
+            con.kv("Wordlists", f"{len(wordlists)} auto-discovered")
+            con.bullet([os.path.basename(_w) for _w in wordlists[:10]],
+                       more=max(0, len(wordlists) - 10), role=INFO)
 
     if not wordlists:
-        print("  No wordlists found.")
+        con.warn("No wordlists found.")
         # rockyou is the default — offer to fetch it when running interactively.
         if sys.stdin.isatty():
             try:
-                _ans = input("  Download rockyou now (~53 MB)? [Y/n] ").strip().lower()
+                _ans = input(f"{IND}Download rockyou now (~53 MB)? [Y/n] ").strip().lower()
             except (EOFError, KeyboardInterrupt):
                 _ans = "n"
                 print()
@@ -653,12 +679,14 @@ def cmd_init(args: argparse.Namespace) -> None:
                 if _rk:
                     wordlists = [_rk]
         if not wordlists:
-            print("  WARNING: no wordlist — wordlist/rule/hybrid phases will be skipped.")
-            print("  Get one with:  python crackbaby.py tools --download rockyou")
-            print("  or pass --wordlists /path/to/list.txt (or set wordlists_dirs in crackbaby.json).")
+            con.warn("no wordlist — wordlist/rule/hybrid phases will be skipped.")
+            con.bullet([
+                "python crackbaby.py tools --download rockyou",
+                "or pass --wordlists /path/to/list.txt (or set wordlists_dirs in crackbaby.json)",
+            ], role=MUTED)
 
     total, unique = _count_unique_hashes(hash_file, args.username)
-    print(f"  Hash file: {total} total lines, {unique} unique NT hashes")
+    con.kv("Hash file", f"{total} total lines, {unique} unique NT hashes")
 
     phase_timeout_secs = None
     if args.phase_timeout:
@@ -670,7 +698,7 @@ def cmd_init(args: argparse.Namespace) -> None:
     if getattr(args, "lm_hashes", None):
         lm_hash_file = os.path.abspath(args.lm_hashes)
         if not os.path.exists(lm_hash_file):
-            print(f"  WARNING: LM hash file not found: {lm_hash_file} — LM phases skipped")
+            con.warn(f"LM hash file not found: {lm_hash_file} — LM phases skipped")
             lm_hash_file = None
 
     # ── Org context: parse from --org-config JSON file ─────────────────────
@@ -679,7 +707,7 @@ def cmd_init(args: argparse.Namespace) -> None:
     if getattr(args, "org_config", None):
         org_cfg_path = os.path.abspath(args.org_config)
         if not os.path.exists(org_cfg_path):
-            print(f"  ERROR: org-config file not found: {org_cfg_path}")
+            con.error(f"org-config file not found: {org_cfg_path}")
             sys.exit(1)
         with open(org_cfg_path) as _f:
             _cfg = json.load(_f)
@@ -689,13 +717,19 @@ def cmd_init(args: argparse.Namespace) -> None:
         org_custom_words = _cfg.get("custom_words", [])
         if not isinstance(org_custom_words, list):
             org_custom_words = []
-        print(f"  Org config:  {org_cfg_path}")
-        if org_name:     print(f"               name:     {org_name}")
-        if org_short:    print(f"               short:    {org_short}")
-        if org_location: print(f"               location: {org_location}")
+        con.kv("Org config", org_cfg_path, value_role=INFO)
+        _org_pairs = []
+        if org_name:     _org_pairs.append(("name", org_name))
+        if org_short:    _org_pairs.append(("short", org_short))
+        if org_location: _org_pairs.append(("location", org_location))
         if org_custom_words:
-            print(f"               custom words: {', '.join(org_custom_words[:8])}"
-                  + (" …" if len(org_custom_words) > 8 else ""))
+            _cw = ", ".join(org_custom_words[:8]) + (" …" if len(org_custom_words) > 8 else "")
+            _org_pairs.append(("custom words", _cw))
+        if _org_pairs:
+            _w = max(len(k) for k, _ in _org_pairs) + 1
+            for _k, _v in _org_pairs:
+                con.print(f"{IND}    {con.paint((_k + ':').ljust(_w), MUTED)} "
+                          f"{con.paint(_v, ACCENT)}")
 
     # Resolve global_potfile: CLI flag wins, then ~/.crackbaby.json config.
     # Note: _cfg here is the org-config JSON dict, only defined when --org-config was
@@ -705,7 +739,7 @@ def cmd_init(args: argparse.Namespace) -> None:
     global_potfile = getattr(args, "global_potfile", None)
     if global_potfile:
         global_potfile = os.path.expanduser(global_potfile)
-        print(f"  Global potfile: {global_potfile}")
+        con.kv("Global potfile", global_potfile, value_role=INFO)
 
     campaign = Campaign(
         name=args.name or os.path.basename(out_dir),
@@ -737,11 +771,12 @@ def cmd_init(args: argparse.Namespace) -> None:
 
     # ── Speed calibration (benchmark prompt) ──────────────────────────────
     if args.expected_speed == 68.0 and not getattr(args, "no_benchmark", False):
-        print("\n  ── Speed calibration ─────────────────────────────────────────────")
-        print(f"  No --expected-speed set. Default is 68 GH/s (single RTX 3090).")
-        print(f"  An accurate speed is needed for time-gating and ETA estimates.")
+        con.blank()
+        con.rule("Speed calibration")
+        con.note("No --expected-speed set. Default is 68 GH/s (single RTX 3090).")
+        con.note("An accurate speed is needed for time-gating and ETA estimates.")
         try:
-            ans = input("  Run a quick benchmark now? [Y/n] ").strip().lower()
+            ans = input(f"{IND}Run a quick benchmark now? [Y/n] ").strip().lower()
         except (EOFError, KeyboardInterrupt):
             ans = "n"
             print()
@@ -763,22 +798,25 @@ def cmd_init(args: argparse.Namespace) -> None:
             if ghs:
                 campaign.expected_speed_ghs = ghs
                 unit, val = ("GH/s", ghs) if ghs >= 1 else ("MH/s", ghs * 1000)
-                print(f"  ✓ Measured: {val:.1f} {unit} — will use for time-gating\n")
+                con.ok(f"Measured: {con.paint(f'{val:.1f} {unit}', ACCENT)} — will use for time-gating")
             else:
-                print("  Benchmark failed. Using 68 GH/s default.")
-                print("  Run 'python crackbaby.py benchmark --update' before skip decisions.\n")
+                con.warn("Benchmark failed. Using 68 GH/s default.")
+                con.note("Run 'python crackbaby.py benchmark --update' before skip decisions.")
         else:
-            print("  Skipping. Run 'python crackbaby.py benchmark --campaign "
-                  f"{out_dir} --update' before using skip/over-hours.\n")
+            con.note(f"Skipping. Run 'python crackbaby.py benchmark --campaign "
+                     f"{out_dir} --update' before using skip/over-hours.")
 
     # ── Check combinator.bin availability ────────────────────────────────────
     if not _find_combinator_bin(campaign=campaign):
-        print("  [INFO] combinator.bin not found alongside hashcat.")
-        print("         combo_rules phases will use rule-convert only when possible.")
-        print("         combinator.bin ships with hashcat — check your hashcat install dir.")
+        con.note("combinator.bin not found alongside hashcat.")
+        con.bullet([
+            "combo_rules phases will use rule-convert only when possible",
+            "combinator.bin ships with hashcat — check your hashcat install dir",
+        ], role=MUTED)
 
     # ── Build initial phase pipeline ──────────────────────────────────────
-    print("  Building attack pipeline...")
+    con.blank()
+    con.note("Building attack pipeline…")
     reset_counter(0)   # fresh campaign — IDs start at P0001
     phases = build_initial_phases(campaign)
     for p in phases:
@@ -789,13 +827,19 @@ def cmd_init(args: argparse.Namespace) -> None:
     total_phases = len(phases)
     skipped_at_init = sum(1 for p in phases if p.status == "skipped")
     active_phases = total_phases - skipped_at_init
-    print(f"\n  Campaign '{campaign.name}' initialized at: {out_dir}")
-    print(f"  {total_phases} phases built"
-          + (f"  ({skipped_at_init} time-gated / pre-skipped)" if skipped_at_init else ""))
-    print(f"  {active_phases} phases will run")
-    print(f"  Wordlists: {len(wordlists)}")
+
+    con.blank()
+    _panel = con.panel(f"Campaign '{campaign.name}' initialized")
+    _panel.kv("Location", out_dir, value_role=INFO)
+    _panel.kv("Phases built", str(total_phases)
+              + (f"  ({skipped_at_init} time-gated / pre-skipped)" if skipped_at_init else ""))
+    _panel.kv("Will run", str(active_phases))
+    _panel.kv("Wordlists", str(len(wordlists)))
+    _panel.print()
     _print_phase_list(campaign, limit=20)
-    print(f"\n  Run with:  python crackbaby.py run {out_dir}\n")
+    con.blank()
+    con.kv("Run with", f"python crackbaby.py run {out_dir}", value_role=ACCENT)
+    con.blank()
 
 
 # ── RUN ───────────────────────────────────────────────────────────────────────
@@ -807,10 +851,12 @@ _stop_requested = False
 def _sigint_handler(sig, frame):
     global _stop_requested
     if _stop_requested:
-        print("\n  Force-stopping...")
+        con.blank()
+        con.warn("Force-stopping…")
         sys.exit(1)
     _stop_requested = True
-    print("\n  Stop requested — waiting for hashcat to checkpoint (Ctrl+C again to force)")
+    con.blank()
+    con.note("Stop requested — waiting for hashcat to checkpoint (Ctrl+C again to force)")
     if _runner_ref:
         _runner_ref.stop()
 
@@ -821,12 +867,46 @@ def _sigint_handler(sig, frame):
 # all phase types (generic hashcat, combo_rules, combinator rule-conversion,
 # piped/generator, lm_brute) behave consistently.
 
+def _erase_status_block(prev_block_lines: list) -> None:
+    """Erase the previously-drawn live-status block via cursor-up + clear.
+
+    Only emits the cursor-control sequence on a TTY; when stdout is redirected
+    the block is left in place (each update simply appends — log-friendly, and
+    no escape codes leak into a captured file).  Resets the line counter to 0.
+    """
+    if prev_block_lines[0]:
+        if con.is_tty:
+            sys.stdout.write(f"\033[{prev_block_lines[0]}A\033[J")
+        prev_block_lines[0] = 0
+
+
+def _status_block_lines(now: str, status: str, speed: str, progress: str,
+                        recovered: str, eta: str, elapsed: str) -> list:
+    """Build the colourised live-status block (8 lines) shown during a phase run.
+
+    Returns a list of ready-to-print lines; the caller owns the in-place
+    redraw (cursor-up + clear).  Keeping this a pure builder means the standard
+    and LM-brute progress callbacks render identically.
+    """
+    v = con.paint("│", MUTED)
+    def label(s: str) -> str:
+        return con.paint(s.ljust(10), MUTED)
+    return [
+        f"{IND}{con.paint('┌─', MUTED)} {con.paint(now, INFO)} {con.paint('─' * 44, MUTED)}",
+        f"{IND}{v}  {label('Status:')} {con.paint(status, ACCENT)}",
+        f"{IND}{v}  {label('Speed:')} {con.paint(speed, ACCENT)}",
+        f"{IND}{v}  {label('Progress:')} {con.paint(progress, ACCENT)}",
+        f"{IND}{v}  {label('Recovered:')} {con.paint(recovered, OK)}",
+        f"{IND}{v}  {label('ETA:')} {con.paint(eta, INFO)}",
+        f"{IND}{v}  {label('Elapsed:')} {con.paint(elapsed, MUTED)}",
+        f"{IND}{con.paint('└' + '─' * 52, MUTED)}",
+    ]
+
+
 def _make_on_line(prev_block_lines: list):
     """Return an on_line callback that clears the last status block then prints the line."""
     def _cb(line, _pb=prev_block_lines):
-        if _pb[0]:
-            sys.stdout.write(f"\033[{_pb[0]}A\033[J")
-            _pb[0] = 0
+        _erase_status_block(_pb)
         print(f"  {line}", flush=True)
     return _cb
 
@@ -840,8 +920,7 @@ def _make_on_progress(phase, prev_block_lines: list):
     unusable values — necessary for stream/stdin-based combo_rules phases.
     """
     def _cb(info, _pb=prev_block_lines, _ph=phase):
-        if _pb[0]:
-            sys.stdout.write(f"\033[{_pb[0]}A\033[J")
+        _erase_status_block(_pb)
         _ks = _ph.estimated_keyspace or 0
         _prog_suffix = ""
         if info.progress_pct > 0:
@@ -878,16 +957,9 @@ def _make_on_progress(phase, prev_block_lines: list):
         if not _eta_str:
             _eta_str = "calculating..."
         now = datetime.now().strftime("%H:%M:%S")
-        block = [
-            f"  ┌─ {now} {'─'*44}",
-            f"  │  Status:    {info.status}",
-            f"  │  Speed:     {info.speed or 'measuring...'}",
-            f"  │  Progress:  {_pct:.2f}%{_prog_suffix}",
-            f"  │  Recovered: {rec_str}",
-            f"  │  ETA:       {_eta_str}",
-            f"  │  Elapsed:   {elapsed_str}",
-            f"  └{'─'*52}",
-        ]
+        block = _status_block_lines(
+            now, info.status, info.speed or "measuring...",
+            f"{_pct:.2f}%{_prog_suffix}", rec_str, _eta_str, elapsed_str)
         print("\n".join(block), flush=True)
         _pb[0] = len(block)
     return _cb
@@ -958,8 +1030,8 @@ def _sync_cracked_file(runner: "HashcatRunner", campaign: "Campaign") -> None:
             with open(cracked_path, "w", encoding="utf-8", errors="ignore") as _cf:
                 for _pt in _pts:
                     _cf.write(_pt + "\n")
-            print(f"  [cracked.txt] Pre-populated from potfile: "
-                  f"{len(_pts)} unique plaintexts")
+            con.note(f"{con.paint('[cracked.txt]', INFO)} pre-populated from potfile: "
+                     f"{con.paint(str(len(_pts)), ACCENT)} unique plaintexts")
     except OSError as _e:
         logger.warning("cracked.txt sync failed: %s", _e)
 
@@ -997,21 +1069,26 @@ def _phase_finish(phase, campaign, runner, total: int, log_path: str,
     phase.status = status_str
 
     if result_msg:
-        print(result_msg)
+        con.print(result_msg)
     else:
         delta = phase.cracked_delta
         new_total = phase.cracked_end
         new_pct = new_total / total * 100 if total else 0
-        print(f"  → {status_str.upper()}  +{delta} cracked  "
-              f"Running total: {new_total}/{total} ({new_pct:.1f}%)  "
-              f"Time: {phase.duration_str}")
+        _b = badge_for(status_str)
+        _delta_role = OK if delta else MUTED
+        con.print(
+            f"{IND}{con.paint('→ ' + status_str.upper(), _b.role)}  "
+            f"{con.paint(f'+{delta} cracked', _delta_role)}  "
+            f"{con.paint('Running total:', MUTED)} "
+            f"{con.paint(f'{new_total}/{total} ({new_pct:.1f}%)', ACCENT)}  "
+            f"{con.paint('Time:', MUTED)} {phase.duration_str}")
 
     if status_str == "failed":
         tail = _tail_log(log_path)
         if tail:
-            print("  [hashcat output (last lines)]:")
+            con.warn("hashcat output (last lines):")
             for ln in tail.splitlines()[-12:]:
-                print(f"    {ln}")
+                con.print(f"{IND}    {con.paint(ln, MUTED)}")
 
     if args.dry_run:
         _mem_status, phase.status = phase.status, "pending"
@@ -1032,7 +1109,7 @@ def _run_lm_brute_phase(phase: Phase, campaign: Campaign, runner: HashcatRunner,
     a forced single --phase runs exactly once and breaks, a normal run advances to
     the next phase, and an interrupt breaks."""
     if not campaign.lm_hash_file or not os.path.exists(campaign.lm_hash_file):
-        print("  LM hash file missing — skipping")
+        con.warn("LM hash file missing — skipping")
         phase.status = "skipped"
         campaign.save()
         return "continue"
@@ -1067,8 +1144,7 @@ def _run_lm_brute_phase(phase: Phase, campaign: Campaign, runner: HashcatRunner,
 
     def on_progress(info, _pb=_prev_block_lines, _ph=phase):
         nonlocal _speed_samples
-        if _pb[0]:
-            sys.stdout.write(f"\033[{_pb[0]}A\033[J")
+        _erase_status_block(_pb)
         elapsed_secs = int(time.time() - _ph.start_time) if _ph.start_time else 0
         eh, rem = divmod(elapsed_secs, 3600); em, es = divmod(rem, 60)
         elapsed_str = f"{eh}h {em}m {es}s" if eh else f"{em}m {es}s" if em else f"{es}s"
@@ -1084,16 +1160,10 @@ def _run_lm_brute_phase(phase: Phase, campaign: Campaign, runner: HashcatRunner,
                 if dt > 1.0 and dpct > 0:
                     hps = (dpct / 100.0 * _ph.estimated_keyspace) / dt
                     speed_display = _fmt_speed(hps / 1e9) + " ~"
-        block = [
-            f"  ┌─ {now} {'─'*44}",
-            f"  │  Status:    {info.status}",
-            f"  │  Speed:     {speed_display or 'measuring...'}",
-            f"  │  Progress:  {info.progress_pct:.2f}%",
-            f"  │  Recovered: {info.recovered}/{info.total}",
-            f"  │  ETA:       {info.eta or 'calculating...'}",
-            f"  │  Elapsed:   {elapsed_str}",
-            f"  └{'─'*52}",
-        ]
+        block = _status_block_lines(
+            now, info.status, speed_display or "measuring...",
+            f"{info.progress_pct:.2f}%", f"{info.recovered}/{info.total}",
+            info.eta or "calculating...", elapsed_str)
         print("\n".join(block), flush=True)
         _pb[0] = len(block)
 
@@ -1120,8 +1190,11 @@ def _run_lm_brute_phase(phase: Phase, campaign: Campaign, runner: HashcatRunner,
     # (_phase_finish re-stamps it microseconds later when it records the phase).
     phase.end_time = time.time()
     delta = phase.cracked_delta
-    _lm_msg = (f"  → {status_str.upper()}  "
-               f"LM cracked, NTLM delta: +{delta}  Time: {phase.duration_str}")
+    _b = badge_for(status_str)
+    _lm_msg = (f"{IND}{con.paint('→ ' + status_str.upper(), _b.role)}  "
+               f"LM cracked, {con.paint('NTLM delta:', MUTED)} "
+               f"{con.paint(f'+{delta}', OK if delta else MUTED)}  "
+               f"{con.paint('Time:', MUTED)} {phase.duration_str}")
     _phase_finish(phase, campaign, runner, total, log_path, status_str,
                   args, _prev_block_lines, dry_run_previewed,
                   result_msg=_lm_msg)
@@ -1146,14 +1219,14 @@ def _run_combo_rules_phase(phase: Phase, campaign: Campaign, runner: HashcatRunn
     _gc_wl2 = phase.combo_wl2 or ""
 
     if not _gc_wl1 or not _gc_wl2:
-        print("  [ERROR] combo_rules phase missing wordlist paths — skipping")
+        con.error("combo_rules phase missing wordlist paths — skipping")
         phase.status = "skipped"
         campaign.save()
         return "continue"
 
     _missing = [p for p in (_gc_wl1, _gc_wl2) if not os.path.exists(p)]
     if _missing:
-        print(f"  [ERROR] combo_rules wordlist not found: {_missing[0]} — skipping")
+        con.error(f"combo_rules wordlist not found: {_missing[0]} — skipping")
         phase.status = "skipped"
         campaign.save()
         return "continue"
@@ -1199,12 +1272,12 @@ def _run_combo_rules_phase(phase: Phase, campaign: Campaign, runner: HashcatRunn
                           + (["-r", _small_rule] if _small_rule else ["-r", "<generated>"])
                           + [_base_path])
             if args.dry_run:
-                print(f"  [DRY-RUN] rule-convert  "
-                      f"{os.path.basename(_small_path)}({_small_lines:,}) → rules "
-                      f"× {os.path.basename(_base_path)}")
+                con.note(f"{con.paint('[dry-run]', MUTED)} rule-convert  "
+                         f"{os.path.basename(_small_path)}({_small_lines:,}) → rules "
+                         f"× {os.path.basename(_base_path)}")
             else:
-                print(f"  [strategy] rule-convert  "
-                      f"{os.path.basename(_small_path)}({_small_lines:,} ≤ {_rule_limit:,}) → rules")
+                con.note(f"{con.paint('[strategy]', INFO)} rule-convert  "
+                         f"{os.path.basename(_small_path)}({_small_lines:,} ≤ {_rule_limit:,}) → rules")
             log_path, _prev = _phase_start(phase, campaign, runner, campaign.logs_dir)
             rc, status_str = runner.run(
                 _rule_args, phase.session_name, log_path,
@@ -1221,10 +1294,10 @@ def _run_combo_rules_phase(phase: Phase, campaign: Campaign, runner: HashcatRunn
     # ── Strategy 2: combinator.bin pipe (fallback) ────────────────────
     _combo_bin = _find_combinator_bin(campaign=campaign)
     if not _combo_bin:
-        print("  [ERROR] combinator.bin not found and rule-convert not eligible "
-              f"({_small_lines:,} lines > {_rule_limit:,} limit) — skipping phase")
-        print("         Install combinator.bin alongside hashcat, or raise "
-              "max_rule_convert_words in crackbaby.json to use rule-convert.")
+        con.error(f"combinator.bin not found and rule-convert not eligible "
+                  f"({_small_lines:,} lines > {_rule_limit:,} limit) — skipping phase")
+        con.note("Install combinator.bin alongside hashcat, or raise "
+                 "max_rule_convert_words in crackbaby.json to use rule-convert.")
         phase.status = "skipped"
         campaign.save()
         return "continue"
@@ -1232,11 +1305,11 @@ def _run_combo_rules_phase(phase: Phase, campaign: Campaign, runner: HashcatRunn
     _piped_args = (["-a", "0"] + _extra_rules
                    + ["--stdin-timeout-abort", "86400"])
     if args.dry_run:
-        print(f"  [DRY-RUN] combinator.bin pipe  "
-              f"{os.path.basename(_gc_wl1)} × {os.path.basename(_gc_wl2)}")
+        con.note(f"{con.paint('[dry-run]', MUTED)} combinator.bin pipe  "
+                 f"{os.path.basename(_gc_wl1)} × {os.path.basename(_gc_wl2)}")
     else:
-        print(f"  [strategy] combinator.bin pipe  "
-              f"{os.path.basename(_gc_wl1)} × {os.path.basename(_gc_wl2)}")
+        con.note(f"{con.paint('[strategy]', INFO)} combinator.bin pipe  "
+                 f"{os.path.basename(_gc_wl1)} × {os.path.basename(_gc_wl2)}")
     log_path, _prev = _phase_start(phase, campaign, runner, campaign.logs_dir)
     rc, status_str = runner.run_piped(
         [_combo_bin, _gc_wl1, _gc_wl2], _piped_args,
@@ -1270,7 +1343,7 @@ def _run_lm_toggle_phase(phase: Phase, campaign: Campaign, runner: HashcatRunner
     (which phase.args already references). Returns "continue" to skip this phase, or
     "proceed" to fall through to the standard hashcat handler."""
     if args.dry_run:
-        print("  [DRY-RUN] LM toggle: would extract LM plaintexts → NTLM toggle attack")
+        con.note(f"{con.paint('[dry-run]', MUTED)} LM toggle: would extract LM plaintexts → NTLM toggle attack")
         # In-memory preview advance (save is a no-op in dry-run) so next_phase()
         # does not re-select this still-pending phase forever.
         phase.status = "running"
@@ -1290,7 +1363,7 @@ def _run_lm_toggle_phase(phase: Phase, campaign: Campaign, runner: HashcatRunner
     lm_words = runner.get_lm_cracked_words(campaign.lm_hash_file,
                                             lm_potfile=campaign.active_lm_potfile)
     if not lm_words:
-        print("  No LM hashes cracked yet — skipping toggle phase")
+        con.note("No LM hashes cracked yet — skipping toggle phase")
         phase.status = "skipped"
         campaign.save()
         return "continue"
@@ -1299,7 +1372,7 @@ def _run_lm_toggle_phase(phase: Phase, campaign: Campaign, runner: HashcatRunner
     with open(lm_wl_path, "w") as lf:
         for w in sorted(set(lm_words)):
             lf.write(w + "\n")
-    print(f"  LM plaintexts: {len(lm_words)} words → {lm_wl_path}")
+    con.kv("LM plaintexts", f"{len(lm_words)} words → {lm_wl_path}")
     # phase.args already has the correct path baked in from build_initial_phases
     return "proceed"
 
@@ -1344,7 +1417,11 @@ def _run_standard_phase(phase: Phase, campaign: Campaign, runner: HashcatRunner,
                     skip_note = f"  → AUTO-SKIP (est. {eta} > {campaign.skip_threshold_hours}h limit)"
 
             spd_str = _fmt_speed(_spd_for_eta)
-            print(f"     Keyspace: {_fmt_keyspace(ks)}  ETA @ {spd_str}: {eta}{timeout_str}{skip_note}")
+            con.print(f"{IND}   {con.paint('Keyspace:', MUTED)} "
+                      f"{con.paint(_fmt_keyspace(ks), INFO)}  "
+                      f"{con.paint('ETA @ ' + spd_str + ':', MUTED)} {eta}"
+                      f"{con.paint(timeout_str, MUTED)}"
+                      f"{con.paint(skip_note, WARN) if skip_note else ''}")
 
             if skip_note:
                 phase.status = "skipped"
@@ -1383,12 +1460,13 @@ def _run_standard_phase(phase: Phase, campaign: Campaign, runner: HashcatRunner,
                 if args.dry_run or _cb_small_rule:
                     _cb_no_opt = _resolve_no_opt(_cb_wl1, _cb_wl2, campaign)
                     _cb_rule_disp = _cb_small_rule or "<small_as_rules.rule>"
-                    print(f"  [combo] {os.path.basename(_cb_wl1)} × {os.path.basename(_cb_wl2)}  "
-                          f"(small side {os.path.basename(_cb_small)}: {_cb_small_lines:,} lines)")
-                    print(f"  [strategy] rules → on-GPU  "
-                          f"(-a 0 {os.path.basename(_cb_base)} -r {os.path.basename(_cb_rule_disp)})  "
-                          f"[{_cb_mode} of {os.path.basename(_cb_small)}, "
-                          f"{_cb_small_lines:,} words]")
+                    con.note(f"{con.paint('[combo]', INFO)} "
+                             f"{os.path.basename(_cb_wl1)} × {os.path.basename(_cb_wl2)}  "
+                             f"(small side {os.path.basename(_cb_small)}: {_cb_small_lines:,} lines)")
+                    con.note(f"{con.paint('[strategy]', INFO)} rules → on-GPU  "
+                             f"(-a 0 {os.path.basename(_cb_base)} -r {os.path.basename(_cb_rule_disp)})  "
+                             f"[{_cb_mode} of {os.path.basename(_cb_small)}, "
+                             f"{_cb_small_lines:,} words]")
                     _cb_args = ["-a", "0", "-r", _cb_rule_disp, _cb_base]
                     _cb_log, _cb_pb = _phase_start(phase, campaign, runner,
                                                     campaign.logs_dir)
@@ -1443,8 +1521,8 @@ def _prepare_run(args: argparse.Namespace) -> _RunContext:
 
     campaign_dir = os.path.abspath(args.campaign)
     if not os.path.exists(os.path.join(campaign_dir, "campaign.json")):
-        print(f"  ERROR: No campaign found at {campaign_dir}")
-        print("  Run 'python crackbaby.py init ...' first.")
+        con.error(f"No campaign found at {campaign_dir}")
+        con.note("Run 'python crackbaby.py init ...' first.")
         sys.exit(1)
 
     campaign = Campaign.load(campaign_dir)
@@ -1471,7 +1549,7 @@ def _prepare_run(args: argparse.Namespace) -> _RunContext:
             _cfg_resolved = _resolve_hashcat_bin(os.path.expanduser(_cfg_hc))
             if os.path.isfile(_cfg_resolved) and os.access(_cfg_resolved, os.X_OK):
                 if _cfg_resolved != _stored_hc:
-                    print(f"  hashcat binary updated: {_stored_hc!r} → {_cfg_resolved!r}")
+                    con.note(f"hashcat binary updated: {_stored_hc!r} → {_cfg_resolved!r}")
                 campaign.hashcat_bin = _cfg_resolved
                 campaign.save()
         else:
@@ -1481,7 +1559,7 @@ def _prepare_run(args: argparse.Namespace) -> _RunContext:
             if _which:
                 _abs = os.path.abspath(_which)
                 if _abs != _stored_hc:
-                    print(f"  hashcat binary resolved: {_stored_hc!r} → {_abs!r}")
+                    con.note(f"hashcat binary resolved: {_stored_hc!r} → {_abs!r}")
                     campaign.hashcat_bin = _abs
                     campaign.save()
         # If still not resolved, leave it as-is — verify_binary() will error below
@@ -1495,7 +1573,7 @@ def _prepare_run(args: argparse.Namespace) -> _RunContext:
         _cfg_gp = _run_user_cfg.get("global_potfile")
         if _cfg_gp:
             _cfg_gp = os.path.expanduser(_cfg_gp)
-            print(f"  Global potfile applied from config: {_cfg_gp}")
+            con.note(f"Global potfile applied from config: {_cfg_gp}")
             campaign.global_potfile = _cfg_gp
             campaign.save()
 
@@ -1534,7 +1612,7 @@ def _prepare_run(args: argparse.Namespace) -> _RunContext:
 
     if not args.dry_run:
         if not runner.verify_binary():
-            print(f"  ERROR: hashcat not found or not executable: {campaign.hashcat_bin}")
+            con.error(f"hashcat not found or not executable: {campaign.hashcat_bin}")
             sys.exit(1)
 
     total = _count_basis_total(campaign)
@@ -1547,9 +1625,11 @@ def _prepare_run(args: argparse.Namespace) -> _RunContext:
         # cracked in a prior campaign and never written to this campaign's cracked.txt.
         if cracked > 0 and not args.dry_run:
             _sync_cracked_file(runner, campaign)
-        print(f"\n  Campaign: {campaign.name}")
-        print(f"  Starting state: {cracked}/{total} cracked ({cracked/total*100:.1f}%)" if total else
-              f"  Starting state: {cracked} cracked")
+        con.blank()
+        con.kv("Campaign", campaign.name)
+        _start = (f"{cracked}/{total} cracked ({cracked/total*100:.1f}%)" if total
+                  else f"{cracked} cracked")
+        con.kv("Starting state", _start)
 
     # Dry-run: suppress all campaign.save() calls during the loop so phase
     # status changes don't get persisted.  Phases are kept in-memory at their
@@ -1604,21 +1684,24 @@ def _run_phase_loop(ctx: _RunContext, args: argparse.Namespace) -> None:
             _forced_done = True
             phase = campaign.get_phase(target_phase)
             if phase is None:
-                print(f"\n  ERROR: Phase {target_phase} not found in campaign.")
+                con.blank()
+                con.error(f"Phase {target_phase} not found in campaign.")
                 break
             if phase.status != "pending":
-                print(f"  [force] Phase {phase.id} status was '{phase.status}' — "
-                      f"resetting to pending (explicit --phase override)")
+                con.note(f"[force] Phase {phase.id} status was '{phase.status}' — "
+                         f"resetting to pending (explicit --phase override)")
                 phase.status = "pending"
                 campaign.save()
         else:
             phase = campaign.next_phase()
             if phase is None:
-                print("\n  All phases complete!")
+                con.blank()
+                con.ok("All phases complete!")
                 break
 
-        print(f"\n  ── Phase {phase.id}: {phase.name} ──")
-        print(f"     Priority: {phase.priority}  Type: {phase.type}")
+        con.blank()
+        con.rule(f"Phase {phase.id}: {phase.name}")
+        con.kv("Priority", f"{phase.priority}   Type: {phase.type}", value_role=())
 
         # ── LM brute phase ─────────────────────────────────────────────────
         if phase.type == "lm_brute":
@@ -1664,16 +1747,18 @@ def _finalize_run(ctx: _RunContext, args: argparse.Namespace) -> None:
     _print_run_summary(campaign, ctx.runner)
 
     if _stop_requested:
-        print(f"  Run paused. Resume with:\n"
-              f"    python crackbaby.py run {ctx.campaign_dir}\n")
+        con.note("Run paused. Resume with:")
+        con.kv("  resume", f"python crackbaby.py run {ctx.campaign_dir}", value_role=ACCENT)
+        con.blank()
     else:
         if not args.dry_run and not any(p.status == "pending" for p in campaign.phases):
-            print("  All phases complete — generating final report...")
+            con.ok("All phases complete — generating final report…")
             reporter = Reporter(campaign)
             report_text = reporter.generate()
-            print(report_text[:3000])
+            print(_colorize_report(report_text[:3000]))
             report_path = os.path.join(campaign.output_dir, "report.txt")
-            print(f"\n  Full report: {report_path}")
+            con.blank()
+            con.kv("Full report", report_path, value_role=INFO)
 
 
 def cmd_run(args: argparse.Namespace) -> None:
@@ -1687,16 +1772,55 @@ def cmd_run(args: argparse.Namespace) -> None:
 
 # ── REPORT ────────────────────────────────────────────────────────────────────
 
+def _colorize_report(text: str) -> str:
+    """Colourise a report for terminal display only.
+
+    The canonical report (report.txt / .json) is built plain by Reporter and is
+    never touched — this is a display-time post-processor, so a no-op when colour
+    is disabled.  Dividers dim, section headers (the line after a ``─`` rule whose
+    first word is uppercase) bold, the ``█`` histogram bars green, and the risk
+    callouts red/amber.
+    """
+    if not con.color:
+        return text
+    out = []
+    prev_rule = False  # previous line was a "────" divider
+    for ln in text.split("\n"):
+        s = ln.strip()
+        first = s.split(" ", 1)[0] if s else ""
+        if s and set(s) <= set("="):
+            out.append(con.paint(ln, MUTED)); prev_rule = False
+        elif s and set(s) <= set("─"):
+            out.append(con.paint(ln, MUTED)); prev_rule = True
+        elif s and set(s) <= set("- "):
+            out.append(con.paint(ln, MUTED)); prev_rule = False
+        elif s.startswith("CRITICAL"):
+            out.append(con.paint(ln, ERR)); prev_rule = False
+        elif s.startswith("HIGH"):
+            out.append(con.paint(ln, WARN)); prev_rule = False
+        elif "█" in ln:
+            i = ln.index("█")
+            out.append(ln[:i] + con.paint(ln[i:].rstrip(), ACCENT)); prev_rule = False
+        elif prev_rule and len(first) >= 4 and first.isalpha() and first.isupper():
+            out.append(con.paint(ln, TITLE)); prev_rule = False
+        elif "CRACKbaby" in ln and "—" in ln:
+            out.append(con.paint(ln, TITLE)); prev_rule = False
+        else:
+            out.append(ln); prev_rule = False
+    return "\n".join(out)
+
+
 def cmd_report(args: argparse.Namespace) -> None:
     campaign_dir = os.path.abspath(args.campaign)
     campaign = Campaign.load(campaign_dir)
     reporter = Reporter(campaign)
     out = getattr(args, "out", None)
     report_text = reporter.generate(output_path=out)
-    print(report_text)
+    print(_colorize_report(report_text))
     if not out:
         out = os.path.join(campaign.output_dir, "report.txt")
-    print(f"\n  Report saved to: {out}")
+    con.blank()
+    con.kv("Report saved to", out, value_role=INFO)
 
 
 # ── ANALYZE ───────────────────────────────────────────────────────────────────
@@ -1761,11 +1885,13 @@ def cmd_benchmark(args: argparse.Namespace) -> None:
 
     # ── Manual overrides (--set and/or --set-threshold) ────────────────────────
     if speed_changed or threshold_changed:
+        con.blank()
+        con.rule("Benchmark: manual override")
         if speed_changed:
             ghs = args.set_speed
             unit, val = ("GH/s", ghs) if ghs >= 1 else ("MH/s", ghs * 1000)
-            print(f"\n  Manual speed override: {val:.1f} {unit}")
-            print(f"  Previous setting:      {campaign.expected_speed_ghs:.1f} GH/s")
+            con.kv("Manual speed override", f"{val:.1f} {unit}")
+            con.kv("Previous setting", f"{campaign.expected_speed_ghs:.1f} GH/s", value_role=MUTED)
             campaign.expected_speed_ghs = ghs
 
         if threshold_changed:
@@ -1773,22 +1899,22 @@ def cmd_benchmark(args: argparse.Namespace) -> None:
             old_t   = campaign.skip_threshold_hours
             old_lbl = f"{old_t}h" if old_t is not None else "none"
             new_lbl = f"{new_t}h" if new_t is not None else "none"
-            print(f"\n  Threshold updated: {old_lbl} → {new_lbl}")
+            con.kv("Threshold updated", f"{old_lbl} → {new_lbl}")
             campaign.skip_threshold_hours = new_t
 
         campaign.save()
 
         if speed_changed:
-            print(f"  ✓ campaign.expected_speed_ghs set to {ghs:.4f} GH/s")
-        print()
+            con.ok(f"campaign.expected_speed_ghs set to {con.paint(f'{ghs:.4f} GH/s', ACCENT)}")
         _print_phase_list(campaign, pending_only=True)
         ks_missing = sum(
             1 for p in campaign.phases
             if p.status == "pending" and p.estimated_keyspace is None
         )
         if ks_missing:
-            print(f"  {ks_missing} pending phase(s) show '?' — run:")
-            print(f"    python crackbaby.py phases --campaign {campaign_dir} --pending --compute-keyspace\n")
+            con.note(f"{con.paint(str(ks_missing), ACCENT)} pending phase(s) show '?' — run:")
+            con.kv("  compute", f"python crackbaby.py phases --campaign {campaign_dir} "
+                   f"--pending --compute-keyspace", value_role=ACCENT)
         return
 
     # ── Hashcat benchmark ──────────────────────────────────────────────────────
@@ -1807,22 +1933,23 @@ def cmd_benchmark(args: argparse.Namespace) -> None:
     mode_name = {1000: "NTLM", 1001: "NTLMv2", 5600: "NetNTLMv2"}.get(
         campaign.hash_type, f"mode {campaign.hash_type}"
     )
-    print(f"\n  Benchmarking {mode_name} (mode {campaign.hash_type})…")
-    print(f"  Binary: {campaign.hashcat_bin}")
+    con.blank()
+    con.rule(f"Benchmark: {mode_name} (mode {campaign.hash_type})")
+    con.kv("Binary", campaign.hashcat_bin, value_role=INFO)
     if campaign.devices:
-        print(f"  Devices: {campaign.devices}")
-    print()
+        con.kv("Devices", campaign.devices, value_role=INFO)
+    con.blank()
 
     ghs = runner.benchmark_speed()
 
     if ghs is None:
-        print("  ERROR: Could not parse benchmark output. Check the hashcat binary path.")
-        print("  Set speed manually with:  python crackbaby.py benchmark --campaign DIR --set <GH/s>")
+        con.error("Could not parse benchmark output. Check the hashcat binary path.")
+        con.note("Set speed manually with:  python crackbaby.py benchmark --campaign DIR --set <GH/s>")
         sys.exit(1)
 
     unit, val = ("GH/s", ghs) if ghs >= 1 else ("MH/s", ghs * 1000)
-    print(f"  Measured speed:  {val:.1f} {unit}")
-    print(f"  Current setting: {campaign.expected_speed_ghs:.1f} GH/s")
+    con.kv("Measured speed", f"{val:.1f} {unit}")
+    con.kv("Current setting", f"{campaign.expected_speed_ghs:.1f} GH/s", value_role=MUTED)
 
     update = args.update
     if not update:
@@ -1835,18 +1962,18 @@ def cmd_benchmark(args: argparse.Namespace) -> None:
     if update:
         campaign.expected_speed_ghs = ghs
         campaign.save()
-        print(f"  ✓ campaign.expected_speed_ghs set to {ghs:.4f} GH/s")
-        print()
+        con.ok(f"campaign.expected_speed_ghs set to {con.paint(f'{ghs:.4f} GH/s', ACCENT)}")
         _print_phase_list(campaign, pending_only=True)
         ks_missing = sum(
             1 for p in campaign.phases
             if p.status == "pending" and p.estimated_keyspace is None
         )
         if ks_missing:
-            print(f"  {ks_missing} pending phase(s) show '?' — run:")
-            print(f"    python crackbaby.py phases --campaign {campaign_dir} --pending --compute-keyspace\n")
+            con.note(f"{con.paint(str(ks_missing), ACCENT)} pending phase(s) show '?' — run:")
+            con.kv("  compute", f"python crackbaby.py phases --campaign {campaign_dir} "
+                   f"--pending --compute-keyspace", value_role=ACCENT)
     else:
-        print("  No change made. Pass --update to skip the prompt.\n")
+        con.note("No change made. Pass --update to skip the prompt.")
 
     # ── Per-type benchmark (--update-all) ─────────────────────────────────────
     if getattr(args, "update_all", False):
@@ -1862,14 +1989,18 @@ def cmd_add(args: argparse.Namespace) -> None:
     rules     = [os.path.abspath(r) for r in (getattr(args, "rules",     None) or [])]
 
     if not wordlists and not rules:
-        print("  ERROR: specify --wordlists, --rules, or both.")
+        con.error("specify --wordlists, --rules, or both.")
         sys.exit(1)
+
+    con.blank()
+    con.rule("Add to campaign")
+    con.blank()
 
     # ── Validate all paths before making any changes ──────────────────────
     for path, label in ([(w, "wordlist") for w in wordlists]
                         + [(r, "rule") for r in rules]):
         if not os.path.exists(path):
-            print(f"  ERROR: {label} not found: {path}")
+            con.error(f"{label} not found: {path}")
             sys.exit(1)
 
     added: list = []
@@ -1881,9 +2012,9 @@ def cmd_add(args: argparse.Namespace) -> None:
         for wl in wordlists:
             if wl not in campaign.wordlists:
                 campaign.wordlists.append(wl)
-                print(f"  Registered wordlist: {os.path.basename(wl)}")
+                con.ok(f"Registered wordlist: {con.paint(os.path.basename(wl), ACCENT)}")
             else:
-                print(f"  Already registered:  {os.path.basename(wl)}")
+                con.note(f"Already registered:  {os.path.basename(wl)}")
 
         new_phases = _generate_new_phases(campaign)
         for p in new_phases:
@@ -1913,13 +2044,22 @@ def cmd_add(args: argparse.Namespace) -> None:
     campaign.save()
 
     if added:
-        print(f"\n  Added {len(added)} phase(s):")
+        con.blank()
+        con.kv("Added", f"{len(added)} phase(s)")
+        _add_tbl = con.table([
+            Column("ID", width=7),
+            Column("Pri", align=">", width=6),
+            Column("Name", width=50),
+            Column("Note", width=20, role=MUTED),
+        ])
         for p in sorted(added, key=lambda x: x.priority):
-            tag = "  [SKIPPED — time-gated]" if p.status == "skipped" else ""
-            print(f"    [{p.id}]  pri={p.priority:<6}  {p.name}{tag}")
+            note = "skipped — time-gated" if p.status == "skipped" else ""
+            _add_tbl.row(p.id, str(p.priority), p.name, note)
+        _add_tbl.print()
     else:
-        print("\n  No new phases — all requested combos already exist in this campaign.")
-    print()
+        con.blank()
+        con.note("No new phases — all requested combos already exist in this campaign.")
+    con.blank()
 
 
 def cmd_rebuild(args: argparse.Namespace) -> None:
@@ -1928,12 +2068,14 @@ def cmd_rebuild(args: argparse.Namespace) -> None:
 
     campaign_dir = os.path.abspath(args.campaign)
     if not os.path.exists(os.path.join(campaign_dir, "campaign.json")):
-        print(f"  ERROR: No campaign found at {campaign_dir}")
+        con.error(f"No campaign found at {campaign_dir}")
         sys.exit(1)
 
     campaign = Campaign.load(campaign_dir)
-    print(f"  Loaded: {campaign.name}  ({len(campaign.phases)} phases, "
-          f"{sum(1 for p in campaign.phases if p.status == 'pending')} pending)")
+    con.blank()
+    con.rule("Rebuild campaign")
+    con.kv("Loaded", f"{campaign.name}  ({len(campaign.phases)} phases, "
+           f"{sum(1 for p in campaign.phases if p.status == 'pending')} pending)")
 
     # ── Apply setting overrides ──────────────────────────────────────────────
     changed = []
@@ -1988,18 +2130,17 @@ def cmd_rebuild(args: argparse.Namespace) -> None:
     for wl_path in (getattr(args, "wordlists", None) or []):
         wl_abs = os.path.abspath(wl_path)
         if not os.path.exists(wl_abs):
-            print(f"  WARNING: wordlist not found, skipping: {wl_abs}")
+            con.warn(f"wordlist not found, skipping: {wl_abs}")
             continue
         if wl_abs not in campaign.wordlists:
             campaign.wordlists.append(wl_abs)
             changed.append(f"wordlists: added {os.path.basename(wl_abs)}")
 
     if changed:
-        print("  Settings updated:")
-        for c in changed:
-            print(f"    {c}")
+        con.kv("Settings updated", f"{len(changed)} change(s)")
+        con.bullet(changed, role=INFO)
     else:
-        print("  No settings changed.")
+        con.note("No settings changed.")
 
     # ── Save updated settings immediately ────────────────────────────────────
     if not args.dry_run:
@@ -2015,7 +2156,7 @@ def cmd_rebuild(args: argparse.Namespace) -> None:
             pass
     reset_counter(_max_n)
 
-    print("  Building candidate phase set...")
+    con.note("Building candidate phase set…")
     candidate_phases = build_initial_phases(campaign)
 
 
@@ -2035,8 +2176,8 @@ def cmd_rebuild(args: argparse.Namespace) -> None:
     else:
         dropped = len(pending)
 
-    print(f"  Phases: {len(non_pending)} kept (non-pending)  |  "
-          f"{dropped} pending dropped  |  {len(new_phases)} new added")
+    con.kv("Phases", f"{len(non_pending)} kept (non-pending)  |  "
+           f"{dropped} pending dropped  |  {len(new_phases)} new added")
 
     # Per-new-wordlist summary: for each wordlist the user just registered,
     # report how many new phases reference it. Surfaces cases where the
@@ -2065,18 +2206,25 @@ def cmd_rebuild(args: argparse.Namespace) -> None:
                 and _wl_abs in (p.args or [])
             )
             _total = _n_combo_rules + _n_combinator + _n_other
-            print(f"    new wordlist {os.path.basename(_wl_abs)}: "
-                  f"{_total} new phase(s)  "
-                  f"(combo_rules={_n_combo_rules}, "
-                  f"combinator={_n_combinator}, other={_n_other})")
+            con.bullet([f"new wordlist {os.path.basename(_wl_abs)}: "
+                        f"{_total} new phase(s)  "
+                        f"(combo_rules={_n_combo_rules}, "
+                        f"combinator={_n_combinator}, other={_n_other})"], role=MUTED)
 
     if args.dry_run:
         if new_phases:
+            con.blank()
+            _rb_tbl = con.table([
+                Column("ID", width=7),
+                Column("Pri", align=">", width=6),
+                Column("Name", width=60),
+            ])
             for p in sorted(new_phases, key=lambda x: x.priority):
-                print(f"    [+] {p.id}  pri={p.priority:<5}  {p.name}")
+                _rb_tbl.row(p.id, str(p.priority), p.name)
+            _rb_tbl.print()
         else:
-            print("    (no new phases would be added)")
-        print("  [DRY-RUN] No changes written.")
+            con.note("(no new phases would be added)")
+        con.note(f"{con.paint('[dry-run]', MUTED)} No changes written.")
         return
 
     if keep_pending:
@@ -2085,8 +2233,10 @@ def cmd_rebuild(args: argparse.Namespace) -> None:
         campaign.phases = non_pending + new_phases
 
     campaign.save()
-    print(f"  Campaign saved → {campaign.state_file}")
-    print(f"\n  Run with:  python crackbaby.py run {campaign_dir}\n")
+    con.ok(f"Campaign saved → {con.paint(campaign.state_file, INFO)}")
+    con.blank()
+    con.kv("Run with", f"python crackbaby.py run {campaign_dir}", value_role=ACCENT)
+    con.blank()
 
 
 def cmd_clean(args: argparse.Namespace) -> None:
@@ -2103,16 +2253,16 @@ def cmd_clean(args: argparse.Namespace) -> None:
     want_rules = getattr(args, "rules_cache", False) or _all
 
     if not (want_logs or want_rules):
-        print("  Nothing requested. Pass --logs, --rules-cache, or --all.")
+        con.note("Nothing requested. Pass --logs, --rules-cache, or --all.")
         return
 
     if not args.campaign:
-        print("  --campaign DIR is required.")
+        con.error("--campaign DIR is required.")
         return
 
     campaign_dir = os.path.abspath(args.campaign)
     if not os.path.exists(os.path.join(campaign_dir, "campaign.json")):
-        print(f"  ERROR: No campaign found at {campaign_dir}")
+        con.error(f"No campaign found at {campaign_dir}")
         return
 
     targets = []  # list[(path, bytes, is_dir)]
@@ -2137,47 +2287,51 @@ def cmd_clean(args: argparse.Namespace) -> None:
             return
         targets.append((p, sz, is_dir))
 
+    con.blank()
+    con.rule("Clean: temp file cleanup")
+
     if want_logs:
         log_dir = os.path.join(campaign_dir, "logs")
-        print(f"  campaign logs dir: {log_dir}")
+        con.kv("campaign logs dir", log_dir, value_role=INFO)
         if os.path.isdir(log_dir):
             for p in glob.glob(os.path.join(log_dir, "*.log")):
                 _add(p)
         else:
-            print("    (directory does not exist — nothing to clean)")
+            con.note("(directory does not exist — nothing to clean)")
 
     if want_rules:
         rules_cache = os.path.join(campaign_dir, "wordlists", "rules_cache")
-        print(f"  rules cache dir: {rules_cache}")
+        con.kv("rules cache dir", rules_cache, value_role=INFO)
         if os.path.isdir(rules_cache):
             for p in glob.glob(os.path.join(rules_cache, "*.rule")):
                 _add(p)
         else:
-            print("    (directory does not exist — nothing to clean)")
+            con.note("(directory does not exist — nothing to clean)")
 
     if not targets:
-        print("  Nothing to clean.")
+        con.note("Nothing to clean.")
         return
 
     total = sum(s for _, s, _ in targets)
-    print(f"\n  Found {len(targets)} item(s) / {total/(1<<20):.1f} MB")
+    con.blank()
+    con.kv("Found", f"{len(targets)} item(s) / {total/(1<<20):.1f} MB")
 
     if args.dry_run:
         for p, s, _ in targets[:25]:
-            print(f"    {s:>12,} bytes  {p}")
+            con.print(f"{IND}    {con.paint(f'{s:>12,}', INFO)} bytes  {p}")
         if len(targets) > 25:
-            print(f"    ... and {len(targets)-25} more")
-        print("  [DRY-RUN] No files deleted.")
+            con.note(f"… and {len(targets)-25} more")
+        con.note(f"{con.paint('[dry-run]', MUTED)} No files deleted.")
         return
 
     if not args.y:
         try:
-            ans = input("  Delete these items? [y/N] ").strip().lower()
+            ans = input(f"{IND}Delete these items? [y/N] ").strip().lower()
         except EOFError:
-            print("  Non-interactive — pass -y to confirm.")
+            con.note("Non-interactive — pass -y to confirm.")
             return
         if ans != "y":
-            print("  Aborted.")
+            con.note("Aborted.")
             return
 
     deleted = freed = 0
@@ -2190,8 +2344,9 @@ def cmd_clean(args: argparse.Namespace) -> None:
             deleted += 1
             freed += s
         except OSError as e:
-            print(f"  WARN: failed to delete {p}: {e}")
-    print(f"  Deleted {deleted} item(s); freed {freed/(1<<20):.1f} MB.")
+            con.warn(f"failed to delete {p}: {e}")
+    con.ok(f"Deleted {con.paint(str(deleted), ACCENT)} item(s); "
+           f"freed {con.paint(f'{freed/(1<<20):.1f} MB', ACCENT)}.")
 
 
 def cmd_phases(args: argparse.Namespace) -> None:
@@ -2213,17 +2368,17 @@ def cmd_phases(args: argparse.Namespace) -> None:
         any_found = False
         for i in delete_ids:
             if i in id_map:
-                print(f"  Deleted  {i}  {id_map[i].name}")
+                con.print(f"{IND}{con.paint('Deleted', ERR)}  {i}  {id_map[i].name}")
                 any_found = True
             else:
-                print(f"  WARNING: {i} not found — skipped")
+                con.warn(f"{i} not found — skipped")
         if any_found and not dry_run:
             keep_set = {i for i in delete_ids if i in id_map}
             campaign.phases = [p for p in campaign.phases if p.id not in keep_set]
             campaign.save()
-            print(f"  {len(keep_set)} phase(s) deleted.")
+            con.ok(f"{len(keep_set)} phase(s) deleted.")
         elif any_found and dry_run:
-            print(f"  Dry run — no changes made. Remove --dry-run to apply.")
+            con.note("Dry run — no changes made. Remove --dry-run to apply.")
         campaign = Campaign.load(campaign_dir)  # reload for list view
 
     # ── Skip / unskip mutation ──────────────────────────────────────────────────
@@ -2239,10 +2394,10 @@ def cmd_phases(args: argparse.Namespace) -> None:
             for pid in unskip_ids:
                 p = campaign.get_phase(pid)
                 if not p:
-                    print(f"  [WARNING] Phase {pid} not found")
+                    con.warn(f"Phase {pid} not found")
                     continue
                 if p.status in ("completed", "running"):
-                    print(f"  [WARNING] Phase {pid} is {p.status} — cannot unskip")
+                    con.warn(f"Phase {pid} is {p.status} — cannot unskip")
                     continue
                 affected.append((p, "pending"))
             action_label = "UNSKIP → pending"
@@ -2257,20 +2412,21 @@ def cmd_phases(args: argparse.Namespace) -> None:
                     from modules.phases import _fmt_keyspace as _fmtks, _compute_keyspace_native
                     needs_ks = [p for p in candidates if p.estimated_keyspace is None]
                     if needs_ks:
-                        print(f"  Computing keyspace for {len(needs_ks)} phase(s)…")
+                        con.note(f"Computing keyspace for {con.paint(str(len(needs_ks)), ACCENT)} phase(s)…")
                         for i, p in enumerate(needs_ks, 1):
-                            print(f"    [{i}/{len(needs_ks)}] {p.id}  {p.name[:55]}",
-                                  end="  ", flush=True)
+                            con.stream.write(f"{IND}    {con.paint(f'[{i}/{len(needs_ks)}]', MUTED)} "
+                                             f"{p.id}  {p.name[:55]}  ")
+                            con.flush()
                             ks = _compute_keyspace_native(p)
                             if ks is not None:
                                 p.estimated_keyspace = ks
-                                print(f"→  {_fmtks(ks)}", flush=True)
+                                con.print(f"→  {con.paint(_fmtks(ks), INFO)}")
                             else:
-                                print("→  (not computable)", flush=True)
+                                con.print(con.paint("→  (not computable)", MUTED))
                             if i % 25 == 0:
                                 campaign.save()
                         campaign.save()
-                        print()
+                        con.blank()
                 # Use per-type speed (same as _time_gate and phases-list display)
                 # so --skip-over-hours matches the ETA shown in the phases table.
                 candidates = [
@@ -2282,23 +2438,33 @@ def cmd_phases(args: argparse.Namespace) -> None:
             action_label = "SKIP"
 
         if not affected:
-            print("  No phases matched the given criteria.")
+            con.note("No phases matched the given criteria.")
         else:
             from modules.phases import _fmt_keyspace
             speed = campaign.expected_speed_ghs
-            print(f"\n  {'Action':<10} {'ID':<8} {'Type':<12} {'ETA':>8}  Name")
-            print(f"  {'-'*9} {'-'*7} {'-'*11} {'-'*8}  {'-'*40}")
+            _action_role = WARN if action_label.startswith("SKIP") else OK
+            con.blank()
+            _mut = con.table([
+                Column("Action", width=16, role=_action_role),
+                Column("ID", width=7),
+                Column("Type", width=12, role=MUTED),
+                Column("ETA", align=">", width=8),
+                Column("Name", width=50),
+            ])
             for p, new_status in affected:
                 ks = p.estimated_keyspace
                 eta_str = _estimate_eta(ks, speed) if ks else "?"
-                print(f"  {action_label:<10} {p.id:<8} {p.type:<12} {eta_str:>8}  {p.name[:50]}")
+                _mut.row(action_label, p.id, p.type, eta_str, p.name)
+            _mut.print()
             if dry_run:
-                print(f"\n  Dry run — no changes made. Remove --dry-run to apply.")
+                con.blank()
+                con.note("Dry run — no changes made. Remove --dry-run to apply.")
             else:
                 for p, new_status in affected:
                     p.status = new_status
                 campaign.save()
-                print(f"\n  {len(affected)} phase(s) updated.")
+                con.blank()
+                con.ok(f"{len(affected)} phase(s) updated.")
 
         campaign = Campaign.load(campaign_dir)  # reload for the list view
 
@@ -2366,56 +2532,62 @@ def _print_run_summary(campaign: Campaign, runner: HashcatRunner):
     summary = campaign.phase_summary()
     elapsed = _fmt_elapsed(campaign.started_at)
 
-    print(f"\n  ╔══ Campaign Status: {campaign.name} {'═' * max(0, 37 - len(campaign.name))}╗")
-    print(f"  ║  Cracked:   {cracked}/{total} ({pct:.1f}%)")
-    print(f"  ║  Elapsed:   {elapsed}")
     done   = summary.get("completed", 0)
     skip   = summary.get("skipped", 0)
     run    = summary.get("running", 0)
     intr   = summary.get("interrupted", 0) + summary.get("timed_out", 0)
     pend   = summary.get("pending", 0)
     fail   = summary.get("failed", 0)
+
+    con.blank()
+    panel = con.panel(f"Campaign Status: {campaign.name}", heavy=True)
+    panel.kv("Cracked", f"{cracked}/{total} ({pct:.1f}%)")
+    panel.kv("Elapsed", elapsed)
     run_str = f"  {run} running" if run else ""
-    print(f"  ║  Phases:    {done} done  {skip} skipped{run_str}  {intr} interrupted  "
-          f"{pend} pending  {fail} failed")
+    panel.kv("Phases", f"{done} done  {skip} skipped{run_str}  {intr} interrupted  "
+             f"{pend} pending  {fail} failed", value_role=())
 
     # Currently running phase (saved as "running" in campaign.json between status polls)
     running_phases = [p for p in campaign.phases if p.status == "running"]
     if running_phases:
-        print(f"  ║")
-        print(f"  ║  Running now:")
+        panel.blank()
+        panel.section("Running now:")
         for p in running_phases:
             elapsed_secs = (time.time() - p.start_time) if p.start_time else None
             elapsed_str = f"  {_fmt_elapsed(p.start_time)}" if elapsed_secs else ""
             cracked_so_far = (runner.count_cracked() - p.cracked_start) if p.cracked_start else 0
             crack_str = f"  +{cracked_so_far} so far" if cracked_so_far else ""
             _rn = (p.name[:49] + "…") if len(p.name) > 50 else p.name
-            print(f"  ║  ► {p.id}  {_rn:<50}{elapsed_str}{crack_str}")
+            panel.line(f"{con.paint('►', ACCENT)} {p.id}  {_rn}"
+                       f"{con.paint(elapsed_str + crack_str, MUTED)}")
 
     # Last few finished phases
     finished = [p for p in campaign.phases
                 if p.status in ("completed", "skipped", "interrupted", "timed_out", "failed")]
     if finished:
-        print(f"  ║")
-        print(f"  ║  Recent phases:")
+        panel.blank()
+        panel.section("Recent phases:")
         for p in finished[-5:]:
             delta_str = f"  +{p.cracked_delta} cracked" if p.cracked_delta else ""
             dur_str = f"  {p.duration_str}" if p.duration_secs else ""
-            tag = {"completed": "✓", "skipped": "–", "interrupted": "⏸",
-                   "timed_out": "⏱", "failed": "✗"}.get(p.status, "?")
+            b = badge_for(p.status)
             _rn = (p.name[:44] + "…") if len(p.name) > 45 else p.name
-            print(f"  ║    {tag} {p.id}  {_rn:<45}{delta_str}{dur_str}")
+            panel.line(f"{con.paint(b.symbol, b.role)} {p.id}  {_rn}"
+                       f"{con.paint(delta_str + dur_str, MUTED)}")
 
     # Next pending phase
     nxt = campaign.next_phase()
     if nxt:
         eta_str = ""
         if nxt.estimated_keyspace:
-            eta_str = f"  ({_estimate_eta(nxt.estimated_keyspace, campaign.expected_speed_ghs)} @ {_fmt_speed(campaign.expected_speed_ghs)})"
-        print(f"  ║")
-        print(f"  ║  Next:  {nxt.id}  {nxt.name}{eta_str}")
+            eta_str = (f"  ({_estimate_eta(nxt.estimated_keyspace, campaign.expected_speed_ghs)} "
+                       f"@ {_fmt_speed(campaign.expected_speed_ghs)})")
+        panel.blank()
+        panel.line(f"{con.paint('Next:', MUTED)} {nxt.id}  {nxt.name}"
+                   f"{con.paint(eta_str, MUTED)}")
 
-    print(f"  ╚{'═' * 58}╝\n")
+    panel.print()
+    con.blank()
 
 
 def _print_phase_list(
@@ -2459,46 +2631,50 @@ def _print_phase_list(
         to_compute = [p for p in phases
                       if p.status == "pending" and p.estimated_keyspace is None]
         if to_compute:
-            print(f"  Computing keyspace for {len(to_compute)} phase(s)…")
+            con.note(f"Computing keyspace for {con.paint(str(len(to_compute)), ACCENT)} phase(s)…")
             for i, p in enumerate(to_compute, 1):
-                print(f"    [{i}/{len(to_compute)}] {p.id}  {p.name[:55]}", end="  ", flush=True)
+                con.stream.write(f"{IND}    {con.paint(f'[{i}/{len(to_compute)}]', MUTED)} "
+                                 f"{p.id}  {p.name[:55]}  ")
+                con.flush()
                 ks = _compute_keyspace_native(p)
                 if ks is not None:
                     p.estimated_keyspace = ks
-                    print(f"→  {_fmtks(ks)}", flush=True)
+                    con.print(f"→  {con.paint(_fmtks(ks), INFO)}")
                 else:
-                    print("→  (not computable)", flush=True)
+                    con.print(con.paint("→  (not computable)", MUTED))
                 if i % 25 == 0:
                     campaign.save()  # incremental saves — Ctrl+C won't lose progress
             campaign.save()
             print()
 
-    status_tag = {
-        "pending":     "     ",
-        "running":     "[RUN]",
-        "completed":   "[OK] ",
-        "failed":      "[ERR]",
-        "skipped":     "[SKP]",
-        "interrupted": "[INT]",
-        "timed_out":   "[TMO]",
-        "dry_run":     "[DRY]",
-    }
-
     _benchmark_ghs = campaign.expected_speed_ghs
+    con.blank()
     if _benchmark_ghs > 0:
-        spd_note = "set via --expected-speed or benchmark" if _benchmark_ghs != 68.0 else "default — run benchmark to calibrate"
-        print(f"\n  ETA estimates @ {_fmt_speed(_benchmark_ghs)} benchmark  ({spd_note})")
-        print(f"  Per-type ratios from speed_factors.json; combo_rules uses sub-strategy key.")
+        spd_note = ("set via --expected-speed or benchmark" if _benchmark_ghs != 68.0
+                    else "default — run benchmark to calibrate")
+        con.kv("ETA basis", f"{_fmt_speed(_benchmark_ghs)} benchmark  ({spd_note})")
+        con.note("Per-type ratios from speed_factors.json; combo_rules uses sub-strategy key. "
+                 "Completed phases show actual runtime.")
     else:
-        print(f"\n  ETA estimates: speed not set — run: python crackbaby.py benchmark {campaign.output_dir} --update")
-    print(f"  Completed phases show actual runtime in the Time column.\n")
+        con.warn(f"ETA estimates: speed not set — run: "
+                 f"python crackbaby.py benchmark {campaign.output_dir} --update")
+    con.blank()
 
     _N = name_width
-    print(f"  {'ID':<8} {'St':<5} {'Pri':>5}  {'Name':<{_N}} {'Type':<12} {'Feed':<9} {'Keyspace':>10}  {'Time':>8}  Cracked")
-    print(f"  {'-'*8} {'-'*5} {'-'*5}  {'-'*_N} {'-'*12} {'-'*9} {'-'*10}  {'-'*8}  {'-'*8}")
+    table = con.table([
+        Column("ID", width=7),
+        Column("St", width=5),
+        Column("Pri", align=">", width=5),
+        Column("Name", width=_N),
+        Column("Type", width=12, role=MUTED),
+        Column("Feed", width=9, role=MUTED),
+        Column("Keyspace", align=">", width=10, role=INFO),
+        Column("Time", align=">", width=8),
+        Column("Cracked", width=8),
+    ])
 
     for p in phases:
-        tag = status_tag.get(p.status, "     ")
+        badge = badge_for(p.status)
         auto = "*" if p.auto_generated else ""
 
         ks = p.estimated_keyspace
@@ -2530,13 +2706,6 @@ def _print_phase_list(
         else:
             cracked_str = f"+{p.cracked_delta}" if p.cracked_delta else ""
 
-        # Name: truncate with … indicator if it doesn't fit, append auto-flag
-        max_name = _N - len(auto)
-        if len(p.name) > max_name:
-            name_trunc = p.name[:max_name - 1] + "…" + auto
-        else:
-            name_trunc = p.name + auto
-
         # Feed column: the strategy driving this phase's ETA — predicted (~) for
         # pending/skipped, actual for ones that have run; blank for plain GPU phases.
         _feed_lbl = ""
@@ -2547,9 +2716,20 @@ def _print_phase_list(
             if _feed_lbl and p.status in ("pending", "skipped"):
                 _feed_lbl += "~"
 
-        print(f"  {p.id:<8} {tag} {p.priority:>5}  {name_trunc:<{_N}} {p.type:<12} "
-              f"{_feed_lbl:<9} {ks_str:>10}  {time_str:>8}  {cracked_str}")
-    print()
+        _cracked_cell = (cracked_str, OK) if cracked_str and cracked_str != "+0" else cracked_str
+        table.row(
+            p.id,
+            (badge.tag, badge.role),
+            str(p.priority),
+            p.name + auto,
+            p.type,
+            _feed_lbl,
+            ks_str,
+            time_str,
+            _cracked_cell,
+        )
+    table.print()
+    con.blank()
 
 
 # ── User config ───────────────────────────────────────────────────────────────
@@ -2591,19 +2771,26 @@ def _load_user_config() -> tuple:
                 if isinstance(cfg, dict):
                     return cfg, path
             except Exception as _e:
-                print(f"  WARNING: config file found but failed to parse ({path}): {_e}")
+                con.warn(f"config file found but failed to parse ({path}): {_e}")
     return {}, ""
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
 def main():
+    # Honour the --no-color flag before any output is drawn. argparse declares it
+    # too (for --help visibility), but we must act here, before the banner, since
+    # the global console already exists. (NO_COLOR / FORCE_COLOR env vars are
+    # handled by the console's own auto-detection, which lets FORCE_COLOR win.)
+    if "--no-color" in sys.argv:
+        set_color_enabled(False)
+
     _print_banner()
 
     # ── Load user config (before argparse so values become defaults) ──────────
     _cfg, _cfg_path = _load_user_config()
     if _cfg_path:
-        print(f"  Config: {_cfg_path}")
+        con.kv("Config", _cfg_path, value_role=INFO)
 
     # Apply search-path overrides immediately — they affect phases module state
     # before build_initial_phases is ever called.
@@ -2630,7 +2817,7 @@ def main():
             with open(_SPEED_FACTORS_FILE, "w") as _sf:
                 import json as _json
                 _json.dump(_speed_mod._SPEED_FACTORS_BOOTSTRAP, _sf, indent=2)
-            print(f"  Created config/speed_factors.json with default ratios — edit to tune for your rig.")
+            con.note("Created config/speed_factors.json with default ratios — edit to tune for your rig.")
         except OSError:
             pass  # read-only install — silent; in-memory bootstrap takes over
 
@@ -2669,6 +2856,9 @@ def main():
     )
     parser.add_argument("--version", action="version",
                         version=f"crackbaby {__version__}")
+    parser.add_argument("--no-color", action="store_true",
+                        help="disable coloured output (also respects the NO_COLOR env var; "
+                             "colour auto-disables when output is piped)")
     # Suppress the redundant "positional arguments:" heading — the subparsers action
     # is the only top-level positional, and the formatter renders it as titled groups.
     parser._positionals.title = argparse.SUPPRESS

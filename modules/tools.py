@@ -68,6 +68,9 @@ def download_wordlist(source: str = "rockyou", dest_dir: Optional[str] = None,
     auto-discovers it. Returns the final wordlist path, or ``None`` on failure (after
     printing a clear error and the URL for manual download).
     """
+    from .console import Console, IND, ACCENT, INFO, MUTED, OK, ERR
+    c = Console()
+
     src = _WORDLIST_SOURCES.get(source)
     if src:
         url, filename, is_gz = src["url"], src["filename"], src.get("gz", False)
@@ -75,8 +78,8 @@ def download_wordlist(source: str = "rockyou", dest_dir: Optional[str] = None,
         # Treat `source` as a raw URL (lets callers fetch arbitrary wordlists).
         url = source
         if not (url.startswith("http://") or url.startswith("https://")):
-            print(f"  ERROR: unknown wordlist '{source}'. Known names: "
-                  f"{', '.join(sorted(_WORDLIST_SOURCES))} — or pass a http(s) URL.")
+            c.error(f"unknown wordlist '{source}'. Known names: "
+                    f"{', '.join(sorted(_WORDLIST_SOURCES))} — or pass a http(s) URL.")
             return None
         filename = os.path.basename(url.split("?")[0]) or "wordlist.txt"
         is_gz = filename.endswith(".gz")
@@ -87,17 +90,18 @@ def download_wordlist(source: str = "rockyou", dest_dir: Optional[str] = None,
     try:
         os.makedirs(dest_dir, exist_ok=True)
     except OSError as e:
-        print(f"  ERROR: cannot create wordlist directory {dest_dir}: {e}")
+        c.error(f"cannot create wordlist directory {dest_dir}: {e}")
         return None
 
     dest = os.path.join(dest_dir, filename)
     if os.path.isfile(dest) and os.path.getsize(dest) > 0 and not force:
-        print(f"  [✓] {filename} already present: {dest}")
-        print( "      Pass --force to re-download.")
+        c.print(f"{IND}{c.paint('[✓]', OK)} {c.paint(filename, ACCENT)} already present: "
+                f"{c.paint(dest, INFO)}")
+        c.print(f"{IND}    {c.paint('Pass --force to re-download.', MUTED)}")
         return dest
 
-    print(f"  Downloading {filename}")
-    print(f"    from {url}")
+    c.print(f"{IND}Downloading {c.paint(filename, ACCENT)}")
+    c.print(f"{IND}    {c.paint('from ' + url, MUTED)}")
     req = urllib.request.Request(url, headers={"User-Agent": "crackbaby/1.0"})
     tmp = dest + ".part"
     try:
@@ -115,18 +119,22 @@ def download_wordlist(source: str = "rockyou", dest_dir: Optional[str] = None,
                     now = time.time()
                     if now - last > 0.2 or done == total:
                         if total:
-                            sys.stdout.write(f"\r    {done / total * 100:5.1f}%  "
+                            pct = c.paint(f"{done / total * 100:5.1f}%", ACCENT)
+                            sys.stdout.write(f"\r{IND}    {pct}  "
                                              f"({_fmt_bytes(done)} / {_fmt_bytes(total)})")
                         else:
-                            sys.stdout.write(f"\r    {_fmt_bytes(done)} downloaded")
+                            sys.stdout.write(f"\r{IND}    "
+                                             f"{c.paint(_fmt_bytes(done) + ' downloaded', ACCENT)}")
                         sys.stdout.flush()
                         last = now
             sys.stdout.write("\n")
     except (urllib.error.URLError, ssl.SSLError, OSError, ValueError) as e:
-        print(f"\n  ERROR: download failed: {e}")
-        print(f"  Fetch it manually into {dest_dir}:")
-        print(f"    curl -L -o '{dest}{'.gz' if is_gz else ''}' '{url}'"
-              + (f" && gunzip '{dest}.gz'" if is_gz else ""))
+        _curl = (f"curl -L -o '{dest}{'.gz' if is_gz else ''}' '{url}'"
+                 + (f" && gunzip '{dest}.gz'" if is_gz else ""))
+        c.blank()
+        c.error(f"download failed: {e}")
+        c.print(f"{IND}  {c.paint('Fetch it manually into ' + dest_dir + ':', MUTED)}")
+        c.print(f"{IND}    {c.paint(_curl, INFO)}")
         try:
             os.path.exists(tmp) and os.unlink(tmp)
         except OSError:
@@ -136,7 +144,7 @@ def download_wordlist(source: str = "rockyou", dest_dir: Optional[str] = None,
     # Decompress (if gzipped) and put the file in place atomically.
     try:
         if is_gz:
-            print(f"  Decompressing → {filename} …")
+            c.print(f"{IND}Decompressing → {c.paint(filename, ACCENT)} …")
             with gzip.open(tmp, "rb") as gz, open(dest + ".out", "wb") as out:
                 shutil.copyfileobj(gz, out, 1 << 20)
             os.replace(dest + ".out", dest)
@@ -144,7 +152,7 @@ def download_wordlist(source: str = "rockyou", dest_dir: Optional[str] = None,
         else:
             os.replace(tmp, dest)
     except (OSError, gzip.BadGzipFile) as e:
-        print(f"  ERROR: could not unpack the download: {e}")
+        c.error(f"could not unpack the download: {e}")
         for p in (tmp, dest + ".out"):
             try:
                 os.path.exists(p) and os.unlink(p)
@@ -153,10 +161,11 @@ def download_wordlist(source: str = "rockyou", dest_dir: Optional[str] = None,
         return None
 
     if not (os.path.isfile(dest) and os.path.getsize(dest) > 0):
-        print("  ERROR: the downloaded wordlist is empty.")
+        c.error("the downloaded wordlist is empty.")
         return None
 
-    print(f"  [✓] {filename} ready: {dest}  ({_fmt_bytes(os.path.getsize(dest))})")
+    c.print(f"{IND}{c.paint('[✓]', OK)} {c.paint(filename, ACCENT)} ready: "
+            f"{c.paint(dest, INFO)}  ({_fmt_bytes(os.path.getsize(dest))})")
     return dest
 
 
@@ -193,6 +202,9 @@ def build_combinator_bin(force: bool = False) -> Optional[str]:
     if no compiler is present, prints platform guidance and returns None. Skips when
     combinator is already found (unless ``force``). Returns the built path, or None.
     """
+    from .console import Console, IND, ACCENT, INFO, MUTED, OK, ERR
+    c = Console()
+
     out_name = "combinator.exe" if os.name == "nt" else "combinator.bin"
     dest_dir = installed_tools_dir()
     dest = os.path.join(dest_dir, out_name)
@@ -200,31 +212,35 @@ def build_combinator_bin(force: bool = False) -> Optional[str]:
     if not force:
         existing = _find_combinator_bin()
         if existing:
-            print(f"  [✓] combinator already present: {existing}")
-            print( "      Pass --force to rebuild.")
+            c.print(f"{IND}{c.paint('[✓]', OK)} combinator already present: {c.paint(existing, INFO)}")
+            c.print(f"{IND}    {c.paint('Pass --force to rebuild.', MUTED)}")
             return existing
 
     cc = shutil.which("cc") or shutil.which("clang") or shutil.which("gcc")
     if not cc:
-        print("  ERROR: no C compiler (cc/clang/gcc) found — cannot build combinator.")
+        c.error("no C compiler (cc/clang/gcc) found — cannot build combinator.")
         if os.name == "nt":
-            print("  combinator.exe ships in hashcat-utils releases:")
-            print("    https://github.com/hashcat/hashcat-utils/releases")
-            print(f"  Download it and drop combinator.exe into {dest_dir}")
+            c.bullet([
+                "combinator.exe ships in hashcat-utils releases:",
+                "  https://github.com/hashcat/hashcat-utils/releases",
+                f"download it and drop combinator.exe into {dest_dir}",
+            ], role=MUTED)
         else:
-            print("  Install a C compiler (Xcode CLT / build-essential), then retry — or:")
-            print("    • brew install hashcat-utils                 (macOS)")
-            print(f"    • copy combinator.bin from your hashcat install into {dest_dir}")
+            c.bullet([
+                "install a C compiler (Xcode CLT / build-essential), then retry, or:",
+                "brew install hashcat-utils                 (macOS)",
+                f"copy combinator.bin from your hashcat install into {dest_dir}",
+            ], role=MUTED)
         return None
 
     try:
         os.makedirs(dest_dir, exist_ok=True)
     except OSError as e:
-        print(f"  ERROR: cannot create {dest_dir}: {e}")
+        c.error(f"cannot create {dest_dir}: {e}")
         return None
 
-    print(f"  Building combinator from source (compiler: {cc})")
-    print(f"    src: {_HCUTILS_RAW}{{{', '.join(_COMBINATOR_SRCS)}}}")
+    c.print(f"{IND}Building combinator from source (compiler: {c.paint(cc, INFO)})")
+    c.print(f"{IND}    {c.paint('src: ' + _HCUTILS_RAW + '{' + ', '.join(_COMBINATOR_SRCS) + '}', MUTED)}")
     tmp_out = dest + ".part"
     src_paths = []
     try:
@@ -235,7 +251,7 @@ def build_combinator_bin(force: bool = False) -> Optional[str]:
                                         timeout=60) as resp:
                 data = resp.read()
             if not data:
-                print(f"  ERROR: downloaded {name} is empty.")
+                c.error(f"downloaded {name} is empty.")
                 _safe_unlink(*src_paths)
                 return None
             p = os.path.join(dest_dir, name)
@@ -243,8 +259,9 @@ def build_combinator_bin(force: bool = False) -> Optional[str]:
                 f.write(data)
             src_paths.append(p)
     except (urllib.error.URLError, ssl.SSLError, OSError, ValueError) as e:
-        print(f"\n  ERROR: could not download combinator sources: {e}")
-        print(f"  Source: {_HCUTILS_RAW}")
+        c.blank()
+        c.error(f"could not download combinator sources: {e}")
+        c.print(f"{IND}  {c.paint('Source: ' + _HCUTILS_RAW, MUTED)}")
         _safe_unlink(*src_paths)
         return None
 
@@ -255,13 +272,13 @@ def build_combinator_bin(force: bool = False) -> Optional[str]:
                                "-o", tmp_out, _COMBINATOR_MAIN],
                               cwd=dest_dir, capture_output=True, text=True, timeout=180)
     except (OSError, subprocess.SubprocessError) as e:
-        print(f"  ERROR: compiler invocation failed: {e}")
+        c.error(f"compiler invocation failed: {e}")
         _safe_unlink(*src_paths, tmp_out)
         return None
     if proc.returncode != 0:
-        print("  ERROR: compiling combinator failed:")
+        c.error("compiling combinator failed:")
         for ln in (proc.stderr or proc.stdout or "").splitlines()[-8:]:
-            print(f"    {ln}")
+            c.print(f"{IND}    {c.paint(ln, MUTED)}")
         _safe_unlink(*src_paths, tmp_out)
         return None
 
@@ -270,15 +287,15 @@ def build_combinator_bin(force: bool = False) -> Optional[str]:
         if os.name != "nt":
             os.chmod(dest, 0o755)
     except OSError as e:
-        print(f"  ERROR: finalizing the combinator build failed: {e}")
+        c.error(f"finalizing the combinator build failed: {e}")
         _safe_unlink(*src_paths, tmp_out)
         return None
     _safe_unlink(*src_paths)
 
     if not (os.path.isfile(dest) and os.path.getsize(dest) > 0):
-        print("  ERROR: the build produced an empty binary.")
+        c.error("the build produced an empty binary.")
         return None
-    print(f"  [✓] combinator ready: {dest}")
+    c.print(f"{IND}{c.paint('[✓]', OK)} combinator ready: {c.paint(dest, INFO)}")
     return dest
 
 
@@ -326,33 +343,45 @@ def _find_combinator_bin(campaign=None, hashcat_bin: Optional[str] = None) -> Op
 
 def _preflight_check(campaign=None) -> None:
     """Display tool status for cmd_tools. Shows hashcat and combinator.bin."""
-    import sys
+    from .console import Console, IND, INFO, MUTED, OK, WARN, ERR
+
+    c = Console()
+    _NAMEW = 14  # width of the tool-name column
+
+    def line(symbol: str, role, name: str, value: str, value_role=INFO) -> None:
+        c.print(f"{IND}{c.paint('[' + symbol + ']', role)} "
+                f"{name.ljust(_NAMEW)} {c.paint(value, value_role)}")
+
+    def hint(text: str) -> None:
+        c.print(f"{IND}     {c.paint('↳ ' + text, MUTED)}")
 
     hashcat_bin = getattr(campaign, "hashcat_bin", None) if campaign else None
     combo_bin   = _find_combinator_bin(campaign=campaign)
 
-    print("\n  ── CRACKbaby Tool Status ─────────────────────────────────────────")
+    c.blank()
+    c.rule("CRACKbaby Tool Status")
+    c.blank()
 
     # hashcat
     if hashcat_bin and os.path.isfile(hashcat_bin):
-        print(f"  [✓] hashcat         : {hashcat_bin}")
+        line("✓", OK, "hashcat", hashcat_bin)
     elif hashcat_bin and shutil.which(hashcat_bin):
-        print(f"  [✓] hashcat         : {shutil.which(hashcat_bin)}")
+        line("✓", OK, "hashcat", shutil.which(hashcat_bin))
     else:
         hc = shutil.which("hashcat") or shutil.which("hashcat.bin")
         if hc:
-            print(f"  [✓] hashcat         : {hc}")
+            line("✓", OK, "hashcat", hc)
         else:
-            print("  [✗] hashcat         : NOT FOUND  (required)")
-            print("       Install from https://hashcat.net/hashcat/")
+            line("✗", ERR, "hashcat", "NOT FOUND  (required)", value_role=ERR)
+            hint("install from https://hashcat.net/hashcat/")
 
     # combinator.bin
     if combo_bin:
-        print(f"  [✓] combinator.bin  : {combo_bin}")
+        line("✓", OK, "combinator.bin", combo_bin)
     else:
-        print("  [!] combinator.bin  : not found  (combo_rules fallback)")
-        print("       Build it with:  crackbaby tools --download combinator")
-        print("       (it also ships with hashcat — combinator.bin in your hashcat dir)")
+        line("!", WARN, "combinator.bin", "not found  (combo_rules fallback)", value_role=MUTED)
+        hint("build it:  crackbaby tools --download combinator")
+        hint("also ships with hashcat — check your hashcat dir")
 
     # default wordlist (rockyou)
     rockyou = None
@@ -363,9 +392,9 @@ def _preflight_check(campaign=None) -> None:
             rockyou = p
             break
     if rockyou:
-        print(f"  [✓] rockyou.txt     : {rockyou}")
+        line("✓", OK, "rockyou.txt", rockyou)
     else:
-        print("  [!] rockyou.txt     : not found  (default wordlist)")
-        print("       Download it with:  crackbaby tools --download rockyou")
+        line("!", WARN, "rockyou.txt", "not found  (default wordlist)", value_role=MUTED)
+        hint("download it:  crackbaby tools --download rockyou")
 
-    print()
+    c.blank()
