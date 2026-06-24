@@ -1417,7 +1417,7 @@ def _run_standard_phase(phase: Phase, campaign: Campaign, runner: HashcatRunner,
                     skip_note = f"  → AUTO-SKIP (est. {eta} > {campaign.skip_threshold_hours}h limit)"
 
             spd_str = _fmt_speed(_spd_for_eta)
-            con.print(f"{IND}   {con.paint('Keyspace:', MUTED)} "
+            con.print(f"{IND}{con.paint('Keyspace:', MUTED)} "
                       f"{con.paint(_fmt_keyspace(ks), INFO)}  "
                       f"{con.paint('ETA @ ' + spd_str + ':', MUTED)} {eta}"
                       f"{con.paint(timeout_str, MUTED)}"
