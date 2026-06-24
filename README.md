@@ -23,13 +23,13 @@
 
 **CRACKbaby** is a standard-library-only Python orchestrator around
 [hashcat](https://hashcat.net/hashcat/) for systematic, **resumable** NTLM password-recovery
-engagements. Point it at the NTLM hashes from an Active Directory dump and it builds and
-runs a prioritised pipeline of hashcat attacks — wordlists, rules, masks, hybrids,
-combinators, and LM cracking — checkpointing after every phase, then produces a
-pentest-quality audit report.
+engagements. Point it at the NTLM hashes from an Active Directory dump and it builds and runs
+a prioritised pipeline of hashcat attacks — wordlists, rules, masks, hybrids, combinators, and
+LM cracking — checkpointing after every phase and producing a pentest-quality audit report. It
+handles the campaign bookkeeping you'd otherwise do by hand: account filtering, attack
+ordering, ETAs and time-gating, per-phase resume, and potfile management.
 
-It does the campaign bookkeeping you'd otherwise do by hand: account filtering, attack
-ordering, ETAs and time-gating, per-phase resume, potfile management, and reporting.
+> **v1.0.1 — now with colors.** Organised, colorized terminal output (auto-plain when piped).
 
 ---
 
@@ -48,6 +48,8 @@ ordering, ETAs and time-gating, per-phase resume, potfile management, and report
   long.
 - **Pentest report** (text + JSON): accounts compromised vs unique passwords, length/charset
   and policy analysis, top patterns, and recommendations.
+- **Colorized, readable output** — panels, tables, and status badges; auto-plain when piped
+  or with `--no-color`.
 - **Pure stdlib** — no `pip install`, just Python + hashcat.
 
 ---
@@ -84,15 +86,14 @@ defaults: `cp config/crackbaby.json.sample config/crackbaby.json`.
 ## Usage
 
 ```bash
-# 1. Prep — extract NT hashes from a secretsdump/NTDS dump, dropping machine and
-#    system accounts and grabbing LM hashes. --username enables account-level reporting.
+# 1. Prep — extract NT hashes from a secretsdump/NTDS dump; drop machine/system
+#    accounts, grab LM hashes. --username enables account-level reporting.
 python3 crackbaby.py prep \
     --ntds secretsdump.out --output target.hashes \
     --username --no-machines --no-system --lm-file target.lm
 
 # 2. Init — create a campaign and build the attack pipeline. rockyou is the default
-#    wordlist (auto-discovered from crackbaby/wordlists/), so --wordlists is optional. Add
-#    --org-config for a targeted wordlist and --lm-hashes to enable the LM fast-path.
+#    wordlist; --org-config adds a targeted list, --lm-hashes enables the LM fast-path.
 python3 crackbaby.py init /campaigns/acme \
     --hashes target.hashes --username \
     --org-config acme.org.json \
