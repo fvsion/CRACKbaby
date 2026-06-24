@@ -48,6 +48,9 @@ config/org.json
 wordlists/
 installed_tools/
 
+# ── Demo materials (slides, GIFs, screenshots — internal, not for public repo) ─
+demo/
+
 # ── Internal notes (not for publication) ─────────────────────────────────────
 memory/
 
