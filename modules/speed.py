@@ -20,6 +20,9 @@ from typing import Optional
 
 from . import CONFIG_DIR as _CONFIG_DIR
 from .campaign import Campaign, Phase
+from .console import Console, ACCENT, INFO, MUTED
+
+_con = Console()
 
 logger = logging.getLogger(__name__)
 
@@ -227,8 +230,9 @@ def _run_per_type_benchmark(campaign, runner, benchmark_ghs: float):
     factors = _load_speed_factors()
     factors["_benchmark_ghs"] = round(benchmark_ghs, 4)
 
-    print("\n  ── Per-type speed calibration ────────────────────────────────────")
-    print(f"  Running {_BENCH_SECS}-second test attacks for each phase type…")
+    _con.blank()
+    _con.rule("Per-type speed calibration")
+    _con.note(f"Running {_BENCH_SECS}-second test attacks for each phase type…")
 
     from .phases import find_rule
     _best66 = find_rule(campaign.custom_rules_dir, "best66.rule")
@@ -279,11 +283,14 @@ def _run_per_type_benchmark(campaign, runner, benchmark_ghs: float):
                 if _sp_ghs and _sp_ghs > 0:
                     factors[_type] = round(_sp_ghs, 4)
                     _u2, _v2 = ("GH/s", _sp_ghs) if _sp_ghs >= 1 else ("MH/s", _sp_ghs * 1000)
-                    print(f"    {_type:<12}: {_v2:.1f} {_u2}")
+                    _con.print(f"  {_con.paint('  ' + _type.ljust(12), MUTED)} "
+                               f"{_con.paint(f'{_v2:.1f} {_u2}', ACCENT)}")
                 else:
-                    print(f"    {_type:<12}: (could not parse speed — keeping default)")
+                    _con.print(f"  {_con.paint('  ' + _type.ljust(12), MUTED)} "
+                               f"{_con.paint('(could not parse speed — keeping default)', MUTED)}")
             except Exception as _e:
-                print(f"    {_type:<12}: (error: {_e})")
+                _con.print(f"  {_con.paint('  ' + _type.ljust(12), MUTED)} "
+                           f"{_con.paint(f'(error: {_e})', MUTED)}")
 
     finally:
         if _td:
@@ -293,5 +300,6 @@ def _run_per_type_benchmark(campaign, runner, benchmark_ghs: float):
                 pass
 
     _save_speed_factors(factors)
-    print(f"\n  ✓ speed_factors.json written to: {_SPEED_FACTORS_FILE}")
-    print(f"  These values are now used for ETA calculations across all campaigns.\n")
+    _con.blank()
+    _con.ok(f"speed_factors.json written to: {_con.paint(_SPEED_FACTORS_FILE, INFO)}")
+    _con.note("These values are now used for ETA calculations across all campaigns.")

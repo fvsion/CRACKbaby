@@ -12,6 +12,9 @@ import logging
 from typing import Callable, List, Optional, Tuple
 
 from .campaign import global_potfile_for_type
+from .console import Console, MUTED, INFO
+
+_con = Console()
 
 logger = logging.getLogger(__name__)
 
@@ -505,7 +508,8 @@ class HashcatRunner:
         logger.info("CMD: %s", _cmd_for_display(cmd))
 
         if dry_run:
-            print("  [DRY-RUN]", " ".join(str(a) for a in cmd))
+            _con.print(f"  {_con.paint('[dry-run]', MUTED)} "
+                       f"{_con.paint(' '.join(str(a) for a in cmd), INFO)}")
             return 0, "dry_run"
 
         self._stop_requested = False
@@ -679,7 +683,8 @@ class HashcatRunner:
             hc_str  = " ".join(str(a) for a in
                                 self._base_args(session, optimize_kernel=optimize_kernel)
                                 + phase_args + [self.hash_file])
-            print(f"  [DRY-RUN] {gen_str} | {hc_str}")
+            _con.print(f"  {_con.paint('[dry-run]', MUTED)} "
+                       f"{_con.paint(f'{gen_str} | {hc_str}', INFO)}")
             return 0, "dry_run"
 
         os.makedirs(self.sessions_dir, exist_ok=True)
