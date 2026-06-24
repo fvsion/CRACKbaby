@@ -625,11 +625,11 @@ def cmd_init(args: argparse.Namespace) -> None:
     out_dir = os.path.abspath(args.campaign)
     if os.path.exists(os.path.join(out_dir, "campaign.json")):
         con.error(f"Campaign already exists at {out_dir}")
-        con.bullet([
-            "run    — continue it (or delete the directory to restart)",
-            "add --wordlists ...  — add new wordlists",
-            "rebuild              — update settings / regenerate phases",
-        ], role=MUTED)
+        con.print(f"{IND}  {con.paint('Use one of these, or delete the directory to start fresh:', MUTED)}")
+        for _cmd, _desc in (("run",     "continue this campaign"),
+                            ("add",     "add wordlists or rules"),
+                            ("rebuild", "change settings / regenerate phases")):
+            con.print(f"{IND}    {con.paint(_cmd.ljust(9), ACCENT)} {con.paint(_desc, MUTED)}")
         sys.exit(1)
 
     # --hashes is required for new campaigns
