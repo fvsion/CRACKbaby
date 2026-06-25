@@ -1620,6 +1620,17 @@ def _prepare_run(args: argparse.Namespace) -> _RunContext:
         campaign.started_at = time.time()
         campaign.save()
 
+    # Resume gracefully-interrupted (Ctrl-C) phases on a plain full-campaign run, mirroring
+    # the hard-kill path that re-queues "running" phases at load. Skip when a single --phase
+    # is targeted (the force path handles exactly that phase) and in --dry-run (don't mutate
+    # persisted status). hashcat --restore continues each re-queued phase mid-keyspace.
+    if not args.phase and not args.dry_run:
+        _requeued = campaign.requeue_interrupted_phases()
+        if _requeued:
+            campaign.save()
+            con.note(f"↻ Resuming {len(_requeued)} interrupted phase(s): "
+                     f"{', '.join(_requeued)}")
+
     runner = HashcatRunner(
         hashcat_bin=campaign.hashcat_bin,
         hash_file=campaign.hash_file,

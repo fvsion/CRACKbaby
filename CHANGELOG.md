@@ -5,6 +5,8 @@ All notable changes to CRACKbaby are recorded here. Versions follow
 
 ## Unreleased
 
+- A plain `run` after a graceful Ctrl-C now resumes the interrupted phase mid-keyspace
+  (via hashcat `--restore`), matching the hard-kill recovery path instead of skipping it.
 - Per-phase crack counts are now additive across runs: an interrupt→resume sums both
   segments and a clean re-run no longer zeros a completed phase.
 - README intro tidied; cross-platform support (Windows, macOS, Linux) called out explicitly.

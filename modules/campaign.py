@@ -293,6 +293,25 @@ class Campaign:
             return None
         return min(pending, key=lambda p: (p.priority, p.id))
 
+    def requeue_interrupted_phases(self) -> List[str]:
+        """Re-queue gracefully-interrupted (Ctrl-C) phases so a plain ``run`` resumes
+        them mid-keyspace via hashcat ``--restore``, matching the hard-kill path that
+        leaves a phase ``running`` (re-queued at load time).
+
+        Unlike that load-time reconciliation, this is invoked only when actually running
+        — never in ``load()`` — so read-only commands (status/report/phases) keep
+        displaying ``interrupted`` honestly. ``timed_out`` is intentionally left terminal:
+        auto-resuming it would defeat the ``--phase-timeout`` bound that produced it.
+
+        Returns the ids of the phases that were re-queued.
+        """
+        requeued = []
+        for p in self.phases:
+            if p.status == "interrupted":
+                p.status = "pending"
+                requeued.append(p.id)
+        return requeued
+
     def add_phase(self, phase: Phase):
         self.phases.append(phase)
 
