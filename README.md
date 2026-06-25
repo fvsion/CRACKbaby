@@ -29,6 +29,7 @@ LM cracking — checkpointing after every phase and producing a pentest-quality 
 handles the campaign bookkeeping you'd otherwise do by hand: account filtering, attack
 ordering, ETAs and time-gating, per-phase resume, and potfile management.
 
+> **v1.0.2.** Keyspace calculation fixes for custom-charset and large-wordlist phases.
 > **v1.0.1 — now with colors.** Organised, colorized terminal output (auto-plain when piped).
 
 ---

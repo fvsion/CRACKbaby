@@ -1,4 +1,4 @@
-# CRACKbaby — User Guide (v1.0.1)
+# CRACKbaby — User Guide (v1.0.2)
 
 > Operational guide for running NTLM password-recovery engagements with crackbaby.
 > For a quick overview and install steps, see **[README.md](README.md)**.

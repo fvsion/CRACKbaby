@@ -76,7 +76,7 @@ logger = logging.getLogger(__name__)
 # Single source of truth for the release version. Update here on every release;
 # the banner and `crackbaby --version` both read this. (README.md and USER_GUIDE.md
 # headers track this value but cannot import it — bump manually per the release checklist.)
-__version__ = "1.0.1"
+__version__ = "1.0.2"
 
 # Compact labels for the phases-list "Feed" column.
 _FEED_ABBR = {
