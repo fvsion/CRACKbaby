@@ -304,6 +304,13 @@ class HashcatRunner:
         if "--increment" in filtered:
             return self._hashcat_keyspace(filtered)
 
+        # Custom charset definitions (-1..-4): needed to size ?1-?4 in any mask.
+        # Values may be hashcat-escaped (e.g. '!@#$%^&*-_+??'); _mask_keyspace
+        # resolves them via phases._charset_size.
+        custom_charsets = {filtered[i][1]: filtered[i + 1]
+                           for i in range(len(filtered) - 1)
+                           if filtered[i] in ("-1", "-2", "-3", "-4")} or None
+
         attack_mode, positionals, rule_files = self._parse_phase_args(filtered)
         if attack_mode is None:
             return None
@@ -332,21 +339,21 @@ class HashcatRunner:
                 mask_arg = positionals[0]
                 if os.path.exists(mask_arg):
                     return self._hcmask_keyspace(mask_arg)  # sum all masks in file
-                return _mask_keyspace(mask_arg)             # inline mask string
+                return _mask_keyspace(mask_arg, custom_charsets)   # inline mask string
 
             elif attack_mode == "6":
                 # Hybrid: wordlist + mask — positionals = [wl, mask]
                 if len(positionals) < 2:
                     return None
                 wl_count = self._count_lines(positionals[0])
-                mask_ks  = _mask_keyspace(positionals[1])
+                mask_ks  = _mask_keyspace(positionals[1], custom_charsets)
                 return min(wl_count * mask_ks, _UINT64_MAX + 1)
 
             elif attack_mode == "7":
                 # Hybrid: mask + wordlist — positionals = [mask, wl]
                 if len(positionals) < 2:
                     return None
-                mask_ks  = _mask_keyspace(positionals[0])
+                mask_ks  = _mask_keyspace(positionals[0], custom_charsets)
                 wl_count = self._count_lines(positionals[1])
                 return min(mask_ks * wl_count, _UINT64_MAX + 1)
 
@@ -376,6 +383,7 @@ class HashcatRunner:
             "--increment-min", "--increment-max",
             "--loopback-wordlists-file",
             "--markov-hcstat2",   # Markov stats file path — not a positional (mask/wordlist)
+            "-1", "-2", "-3", "-4",  # custom-charset definitions — value is the charset, not a positional
         }
         attack_mode = None
         rule_files   = []
@@ -424,7 +432,10 @@ class HashcatRunner:
         Returns the total (capped at _UINT64_MAX + 1 if it overflows).
         Falls back to hashcat --keyspace if the file cannot be parsed.
         """
-        from .phases import _mask_keyspace_simple as _mask_keyspace
+        # Use the phases helper per line: it splits the inline "cs,,,,mask" prefix
+        # and sizes ?1 from it, so custom-charset masks are counted correctly
+        # (a bare "_mask_keyspace(line)" would treat the prefix as literals).
+        from .phases import _hcmask_keyspace as _line_keyspace
         _UINT64_MAX = (1 << 64) - 1
         try:
             total = 0
@@ -433,7 +444,7 @@ class HashcatRunner:
                     line = line.strip()
                     if not line or line.startswith("#"):
                         continue
-                    total += _mask_keyspace(line)
+                    total += _line_keyspace(line)
                     if total > _UINT64_MAX:
                         return _UINT64_MAX + 1
             return total if total > 0 else 0
