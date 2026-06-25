@@ -23,7 +23,8 @@
 
 **CRACKbaby** is a standard-library-only Python orchestrator around
 [hashcat](https://hashcat.net/hashcat/) for systematic, **resumable** NTLM password-recovery
-engagements. Point it at the NTLM hashes from an Active Directory dump and it builds and runs
+engagements. It's **cross-platform** — one script that runs anywhere Python and hashcat do:
+**Windows, macOS, and Linux**. Point it at the NTLM hashes from an Active Directory dump and it builds and runs
 a prioritised pipeline of hashcat attacks — wordlists, rules, masks, hybrids, combinators, and
 LM cracking — checkpointing after every phase and producing a pentest-quality audit report. It
 handles the campaign bookkeeping you'd otherwise do by hand: account filtering, attack
@@ -54,12 +55,13 @@ ordering, ETAs and time-gating, per-phase resume, and potfile management.
 - **Colorized, readable output** — panels, tables, and status badges; auto-plain when piped
   or with `--no-color`.
 - **Pure stdlib** — no `pip install`, just Python + hashcat.
+- **Cross-platform** — a single script that runs on Windows, macOS, and Linux.
 
 ---
 
 ## Requirements
 
-- Python 3.8+ (standard library only)
+- Python 3.8+ (standard library only) — Windows, macOS, or Linux
 - hashcat 6.x or 7.x
 - One or more wordlists (e.g. rockyou)
 - Optional: `combinator.bin` (ships with hashcat) — only for very large wordlist×wordlistxrule phases
