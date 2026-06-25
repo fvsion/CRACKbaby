@@ -21,17 +21,13 @@
  @@@@@@@@@@%#*#%***#%@%*=-.      :+*%%@%%=-:::==-               b  a  b  y
 ```
 
-**CRACKbaby** is a standard-library-only Python orchestrator around
-[hashcat](https://hashcat.net/hashcat/) for systematic, **resumable** NTLM password-recovery
-engagements. It's **cross-platform** — one script that runs anywhere Python and hashcat do:
-**Windows, macOS, and Linux**. Point it at the NTLM hashes from an Active Directory dump and it builds and runs
-a prioritised pipeline of hashcat attacks — wordlists, rules, masks, hybrids, combinators, and
-LM cracking — checkpointing after every phase and producing a pentest-quality audit report. It
-handles the campaign bookkeeping you'd otherwise do by hand: account filtering, attack
-ordering, ETAs and time-gating, per-phase resume, and potfile management.
-
-> **v1.0.2.** Keyspace calculation fixes for custom-charset and large-wordlist phases.
-> **v1.0.1 — now with colors.** Organised, colorized terminal output (auto-plain when piped).
+**CRACKbaby** is a [hashcat](https://hashcat.net/hashcat/) orchestrator for systematic,
+**resumable** NTLM password-recovery engagements. Point it at the NTLM hashes from an Active
+Directory dump and it builds and runs a prioritised pipeline of hashcat attacks — wordlists,
+rules, masks, hybrids, combinators, and LM cracking — checkpointing after every phase and
+producing a pentest-quality audit report. It handles the campaign bookkeeping you'd otherwise
+do by hand: account filtering, attack ordering, ETAs and time-gating, per-phase resume, and
+potfile management. Runs on Windows, macOS, and Linux.
 
 ![CRACKbaby building an org-specific wordlist and running a campaign](docs/demo.gif)
 
@@ -152,6 +148,7 @@ template in [`config/org.json.sample`](config/org.json.sample).
   report, and the command reference.
 - **[WALKTHROUGH.md](WALKTHROUGH.md)** — a hands-on, end-to-end example campaign against
   the bundled sample dump, with real command output.
+- **[CHANGELOG.md](CHANGELOG.md)** — release history.
 
 ---
 
