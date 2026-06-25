@@ -903,11 +903,31 @@ def _status_block_lines(now: str, status: str, speed: str, progress: str,
     ]
 
 
+# Raw hashcat stdout chatter we never surface — pure workload/keyspace churn that
+# hashcat repeats dozens of times and that carries no information for the operator.
+_HASHCAT_NOISE = frozenset((
+    "Approaching final keyspace - workload adjusted.",
+    "Approaching final keyspace - workload adjusted, or check the readme for more information.",
+))
+
+
 def _make_on_line(prev_block_lines: list):
-    """Return an on_line callback that clears the last status block then prints the line."""
+    """Return an on_line callback that surfaces raw hashcat output, cleaned up.
+
+    Each passed-through line is dimmed (it's subordinate to the styled status
+    block), blank lines and known chatter are dropped, and consecutive duplicates
+    are collapsed — so a phase no longer spews a wall of identical
+    "Approaching final keyspace" lines.
+    """
+    last = [None]
+
     def _cb(line, _pb=prev_block_lines):
+        s = line.strip()
+        if not s or s in _HASHCAT_NOISE or s == last[0]:
+            return
+        last[0] = s
         _erase_status_block(_pb)
-        print(f"  {line}", flush=True)
+        con.print(f"{IND}{con.paint(s, MUTED)}")
     return _cb
 
 
