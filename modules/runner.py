@@ -501,11 +501,11 @@ class HashcatRunner:
                 "--restore-file-path", restore_path,
                 "--status", "--status-timer", str(self.status_interval),
             ]
-            logger.info("Resuming session %s", session)
+            _con.note(f"Resuming session {session}")
         else:
             cmd = self._base_args(session, optimize_kernel=optimize_kernel) + [self.hash_file] + phase_args
 
-        logger.info("CMD: %s", _cmd_for_display(cmd))
+        logger.debug("CMD: %s", _cmd_for_display(cmd))
 
         if dry_run:
             _con.print(f"  {_con.paint('[dry-run]', MUTED)} "
@@ -693,7 +693,7 @@ class HashcatRunner:
         cmd = self._base_args(session, optimize_kernel=optimize_kernel) + phase_args + [self.hash_file]
         gen_desc = (" ".join(str(a) for a in generator_cmd)
                     if generator_cmd else "[python generator]")
-        logger.info("PIPED CMD: %s | %s", gen_desc, _cmd_for_display(cmd))
+        logger.debug("PIPED CMD: %s | %s", gen_desc, _cmd_for_display(cmd))
 
         self._stop_requested = False
         self._timed_out = False
@@ -944,7 +944,7 @@ class HashcatRunner:
         cmd = [self.hashcat_bin, "--benchmark", "-m", str(self.hash_type)]
         if self.devices:
             cmd.extend(["-d", self.devices])
-        logger.info("Benchmark CMD: %s", _cmd_for_display(cmd))
+        logger.debug("Benchmark CMD: %s", _cmd_for_display(cmd))
         _saved_console = _save_console_mode()
         try:
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=180,
