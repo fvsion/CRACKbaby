@@ -175,42 +175,29 @@ _SAMPLE_POSITIONS = 5           # evenly-distributed positions across the file
 
 def _count_file_lines(path: str) -> int:
     """
-    Count (or estimate) lines in a wordlist file.
+    Exactly count newline-delimited lines in a wordlist file.
 
-    Files ≤ 64 MB are read fully for an exact count (< 0.1 s on any modern disk).
-    Larger files are estimated by sampling _SAMPLE_POSITIONS evenly-distributed
-    1 MB windows across the file, averaging their newline density, then scaling to
-    the full file size.  Sampling from the beginning only is deliberately avoided:
-    files like rockyou2024 start with very short passwords (~4 bytes/line) but
-    average ~16 bytes/line overall, causing a 3-4× overestimate with a
-    beginning-only sample.  Distributed sampling keeps the error under ~2×.
-    Cached by path.  Returns 0 if the file cannot be read.
+    Streams the file in 1 MB binary chunks and counts ``\\n`` bytes — fast
+    (memory-bandwidth bound, sub-second for rockyou; a few seconds even for
+    multi-GB lists) and memory-safe regardless of size.  This is the *same*
+    algorithm runner._count_lines uses, so the build-time keyspace shown at
+    init and the run-time keyspace match exactly (and match `wc -l`).
+
+    An earlier version sampled large files and extrapolated, which over-counted
+    rockyou by ~1.5% (and up to ~2× for skewed lists), making every wordlist-based
+    keyspace and ETA inaccurate.  Cached by path.  Returns 0 if unreadable.
     """
     if path in _LINE_COUNT_CACHE:
         return _LINE_COUNT_CACHE[path]
     try:
-        size = os.path.getsize(path)
-        if size == 0:
+        if os.path.getsize(path) == 0:
             _LINE_COUNT_CACHE[path] = 0
             return 0
+        count = 0
         with open(path, "rb") as f:
-            if size <= _EXACT_LIMIT:
-                count = max(f.read().count(b"\n"), 1)
-            else:
-                stride = max(size // _SAMPLE_POSITIONS, _SAMPLE_CHUNK)
-                total_nl   = 0
-                total_read = 0
-                for i in range(_SAMPLE_POSITIONS):
-                    offset = i * stride
-                    if offset >= size:
-                        break
-                    f.seek(offset)
-                    chunk = f.read(_SAMPLE_CHUNK)
-                    if chunk:
-                        total_nl   += chunk.count(b"\n")
-                        total_read += len(chunk)
-                count = max(int(total_nl * size / total_read), 1) if total_read else 1
-        _LINE_COUNT_CACHE[path] = count
+            for chunk in iter(lambda: f.read(1 << 20), b""):
+                count += chunk.count(b"\n")
+        _LINE_COUNT_CACHE[path] = max(count, 1)   # non-empty file is at least 1 line
     except OSError:
         _LINE_COUNT_CACHE[path] = 0
     return _LINE_COUNT_CACHE[path]
@@ -408,8 +395,8 @@ def _hcmask_keyspace(hcmask_line: str,
     if charset:
         cs: Optional[dict] = {"1": charset.size}
     else:
-        raw = parts[0].replace("??", "?")   # unescape literal ?
-        cs  = {"1": len(raw)} if raw else None
+        size1 = _charset_size(parts[0])     # slot-1 charset from the inline prefix
+        cs    = {"1": size1} if size1 else None
     return _mask_keyspace_simple(mask, cs)
 
 
@@ -424,15 +411,46 @@ def _brute_ks(mask: str,
     return _mask_keyspace_simple(mask, cs)
 
 
+# hashcat built-in charset sizes (?l ?u ?d ?s ?a ?b), used by both mask-keyspace
+# math and custom-charset sizing.
+_BUILTIN_CHARSET_SIZE = {'l': 26, 'u': 26, 'd': 10, 's': 33, 'a': 95, 'b': 256}
+
+
+def _charset_size(value: str) -> int:
+    """Number of distinct characters a hashcat charset string expands to.
+
+    Correctly accounts for hashcat's syntax inside a charset value:
+      - ``??``           → one literal ``?``
+      - ``?d ?l ?u ?s ?a ?b`` → the built-in charset's size (10, 26, …)
+      - anything else    → a single literal character
+
+    So ``"!@#$%^&*-_+??"`` (the escaped form of the 12-char enterprise set) → 12,
+    and ``"?d?l"`` → 36.  This is what makes the keyspace for a mask using ``?1``
+    come out right regardless of how the ``-1`` charset was written.
+    """
+    n = 0
+    i = 0
+    while i < len(value):
+        if value[i] == '?' and i + 1 < len(value):
+            nxt = value[i + 1]
+            n += 1 if nxt == '?' else _BUILTIN_CHARSET_SIZE.get(nxt, 1)
+            i += 2
+        else:
+            n += 1
+            i += 1
+    return n
+
+
 def _mask_keyspace_simple(mask: str, custom_charsets: Optional[dict] = None) -> int:
     """
     Compute keyspace for a hashcat mask string.
-    Handles ?l ?u ?d ?s ?a and custom charsets ?1-?4.
+    Handles ?l ?u ?d ?s ?a ?b and custom charsets ?1-?4.
     Pass custom_charsets={key: charset_string} to resolve ?1-?4
-    (e.g. {"1": "!@#$%^&*-_+?"} → ?1 = 12 chars).
+    (e.g. {"1": "!@#$%^&*-_+?"} → ?1 = 12 chars).  Charset values may be an int
+    (logical size), a HashcatCharset, or a raw/escaped charset string.
     Literal characters contribute 1 to the product.
     """
-    _size = {'l': 26, 'u': 26, 'd': 10, 's': 33, 'a': 95}
+    _size = dict(_BUILTIN_CHARSET_SIZE)
     if custom_charsets:
         for k, v in custom_charsets.items():
             if isinstance(v, int):
@@ -440,7 +458,7 @@ def _mask_keyspace_simple(mask: str, custom_charsets: Optional[dict] = None) -> 
             elif hasattr(v, "size"):        # HashcatCharset — use .size (logical count)
                 _size[str(k)] = v.size
             else:
-                _size[str(k)] = len(v)     # raw string fallback
+                _size[str(k)] = _charset_size(v)   # raw/escaped charset string
     ks = 1
     i = 0
     while i < len(mask):
