@@ -32,6 +32,8 @@ ordering, ETAs and time-gating, per-phase resume, and potfile management.
 > **v1.0.2.** Keyspace calculation fixes for custom-charset and large-wordlist phases.
 > **v1.0.1 — now with colors.** Organised, colorized terminal output (auto-plain when piped).
 
+![CRACKbaby building an org-specific wordlist and running a campaign](docs/demo.gif)
+
 ---
 
 ## Features
