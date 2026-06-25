@@ -47,6 +47,9 @@ class Phase:
     status: str = "pending"   # pending | running | completed | failed | skipped | interrupted
     cracked_start: int = 0
     cracked_end: int = 0
+    cracked_recorded: int = 0   # cumulative cracks attributed to this phase across ALL its
+                                # runs; accumulated per run so interrupt→resume is additive
+                                # and a clean re-run doesn't zero a completed phase
     start_time: Optional[float] = None
     end_time: Optional[float] = None
     auto_generated: bool = False
@@ -81,7 +84,13 @@ class Phase:
 
     @property
     def cracked_delta(self) -> int:
+        """New cracks from the most recent run only (this segment)."""
         return max(0, self.cracked_end - self.cracked_start)
+
+    @property
+    def cracked_total(self) -> int:
+        """Cumulative cracks attributed to this phase across all of its runs."""
+        return self.cracked_recorded
 
     @property
     def session_name(self) -> str:

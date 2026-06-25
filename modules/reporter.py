@@ -149,7 +149,7 @@ class Reporter:
         for p in c.phases:
             if p.status in ("completed", "failed", "skipped", "interrupted"):
                 _h(f"  {p.id:<8} {p.name[:44]:<45} {p.status:<12} "
-                   f"{'+'+str(p.cracked_delta):<10} {p.duration_str}")
+                   f"{'+'+str(p.cracked_total):<10} {p.duration_str}")
         _h("")
 
         # ── Analysis ────────────────────────────────────────────────────────
@@ -401,7 +401,9 @@ class Reporter:
                     "name": p.name,
                     "type": p.type,
                     "status": p.status,
-                    "cracked_delta": p.cracked_delta,
+                    # cumulative cracks across all runs of this phase; key kept for
+                    # backward compatibility with existing report.json consumers.
+                    "cracked_delta": p.cracked_total,
                     "duration_secs": p.duration_secs,
                     "auto_generated": p.auto_generated,
                 }
