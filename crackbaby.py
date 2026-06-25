@@ -1087,6 +1087,9 @@ def _phase_finish(phase, campaign, runner, total: int, log_path: str,
     phase.end_time = time.time()
     phase.cracked_end = runner.count_cracked() if not args.dry_run else phase.cracked_start
     phase.status = status_str
+    # Accumulate this run's new cracks so the phase's recorded total is additive across
+    # runs (interrupt→resume sums both segments; a clean re-run adds ~0 and preserves it).
+    phase.cracked_recorded += phase.cracked_delta
 
     if result_msg:
         con.print(result_msg)
@@ -1209,7 +1212,9 @@ def _run_lm_brute_phase(phase: Phase, campaign: Campaign, runner: HashcatRunner,
     # Stamp end_time before building the message so duration_str is populated here
     # (_phase_finish re-stamps it microseconds later when it records the phase).
     phase.end_time = time.time()
-    delta = phase.cracked_delta
+    # cracked_end isn't refreshed until _phase_finish, so compute this run's NTLM
+    # segment directly from the (main) runner against the start snapshot.
+    delta = max(0, runner.count_cracked() - phase.cracked_start)
     _b = badge_for(status_str)
     _lm_msg = (f"{IND}{con.paint('→ ' + status_str.upper(), _b.role)}  "
                f"LM cracked, {con.paint('NTLM delta:', MUTED)} "
@@ -2588,7 +2593,7 @@ def _print_run_summary(campaign: Campaign, runner: HashcatRunner):
         panel.blank()
         panel.section("Recent phases:")
         for p in finished[-5:]:
-            delta_str = f"  +{p.cracked_delta} cracked" if p.cracked_delta else ""
+            delta_str = f"  +{p.cracked_total} cracked" if p.cracked_total else ""
             dur_str = f"  {p.duration_str}" if p.duration_secs else ""
             b = badge_for(p.status)
             _rn = (p.name[:44] + "…") if len(p.name) > 45 else p.name
@@ -2724,7 +2729,7 @@ def _print_phase_list(
             cracked_so_far = (runner.count_cracked() - p.cracked_start) if (runner and p.cracked_start) else 0
             cracked_str = f"+{cracked_so_far}"
         else:
-            cracked_str = f"+{p.cracked_delta}" if p.cracked_delta else ""
+            cracked_str = f"+{p.cracked_total}" if p.cracked_total else ""
 
         # Feed column: the strategy driving this phase's ETA — predicted (~) for
         # pending/skipped, actual for ones that have run; blank for plain GPU phases.
